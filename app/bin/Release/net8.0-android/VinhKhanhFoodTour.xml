@@ -1,0 +1,380 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>VinhKhanhFoodTour</name>
+    </assembly>
+    <members>
+        <member name="T:VinhKhanhFoodTour.App">
+            <summary>
+            MAUI Application class.
+            Sets up the main shell and initial page when the app starts.
+            </summary>
+        </member>
+        <member name="T:VinhKhanhFoodTour.Interfaces.ILocationService">
+            <summary>
+            Interface for location tracking service.
+            Abstracts the geolocation functionality for the application.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.ILocationService.GetCurrentLocationAsync">
+            <summary>
+            Gets the current location of the device asynchronously.
+            </summary>
+            <returns>A Location object containing latitude and longitude, or null if unavailable.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.ILocationService.CheckAndRequestPermissionAsync">
+            <summary>
+            Checks if geolocation permission is granted.
+            </summary>
+            <returns>True if permission is granted, false otherwise.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.ILocationService.IsLocationServiceEnabledAsync">
+            <summary>
+            Checks if location services are enabled on the device.
+            </summary>
+            <returns>True if location services are enabled, false otherwise.</returns>
+        </member>
+        <member name="T:VinhKhanhFoodTour.Interfaces.INarrationService">
+            <summary>
+            Interface for narration and geofence management service.
+            Handles distance calculations, cooldown checks, and TTS playback.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.INarrationService.CalculateDistance(System.Double,System.Double,System.Double,System.Double)">
+            <summary>
+            Calculates the distance in meters between a user location and a POI using the Haversine formula.
+            </summary>
+            <param name="userLatitude">User's current latitude.</param>
+            <param name="userLongitude">User's current longitude.</param>
+            <param name="poiLatitude">POI's latitude.</param>
+            <param name="poiLongitude">POI's longitude.</param>
+            <returns>Distance in meters.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.INarrationService.ShouldTriggerNarration(VinhKhanhFoodTour.Models.PoiModel,System.Double,System.Double)">
+            <summary>
+            Checks if a POI should trigger narration based on:
+            1. User being within the geofence radius
+            2. Cooldown period not being active
+            </summary>
+            <param name="poi">The POI to check.</param>
+            <param name="userLatitude">User's current latitude.</param>
+            <param name="userLongitude">User's current longitude.</param>
+            <returns>True if narration should be triggered, false otherwise.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.INarrationService.PlayNarrationAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Plays the narration text using Text-to-Speech.
+            </summary>
+            <param name="text">The text to speak.</param>
+            <param name="cancellationToken">CancellationToken to stop playback.</param>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.INarrationService.ResetPoiCooldown(System.Int32)">
+            <summary>
+            Resets the cooldown for a specific POI (used for testing purposes).
+            </summary>
+            <param name="poiId">The ID of the POI.</param>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Interfaces.INarrationService.GetLastTriggeredTime(System.Int32)">
+            <summary>
+            Gets the last triggered time for a POI, or null if never triggered.
+            </summary>
+            <param name="poiId">The ID of the POI.</param>
+            <returns>DateTime of last trigger, or null if never triggered.</returns>
+        </member>
+        <member name="T:VinhKhanhFoodTour.MauiProgram">
+            <summary>
+            MAUI application configuration and dependency injection setup.
+            Configures services, viewmodels, and pages for the application.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.MauiProgram.CreateMauiApp">
+            <summary>
+            Creates and configures the MAUI application with dependency injection.
+            
+            Service Registration:
+            1. ILocationService -> LocationService (GPS tracking)
+            2. INarrationService -> NarrationService (Distance calc, TTS, cooldown)
+            3. LocationTrackingViewModel (Main ViewModel)
+            4. MainPage (UI)
+            </summary>
+        </member>
+        <member name="T:VinhKhanhFoodTour.Models.NarrationLogEntry">
+            <summary>
+            Represents a log entry for a triggered narration event.
+            Used to display narration history in the UI.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.NarrationLogEntry.PoiName">
+            <summary>
+            Name of the POI that triggered the narration.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.NarrationLogEntry.TriggeredAt">
+            <summary>
+            Timestamp when the narration was triggered.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.NarrationLogEntry.NarrationText">
+            <summary>
+            The description text that was narrated.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.NarrationLogEntry.UserLocation">
+            <summary>
+            User's location when narration was triggered.
+            </summary>
+        </member>
+        <member name="T:VinhKhanhFoodTour.Models.PoiModel">
+            <summary>
+            Represents a Point of Interest (POI) for the food tour.
+            Contains location data and narration information for TTS playback.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.PoiModel.Id">
+            <summary>
+            Unique identifier for the POI.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.PoiModel.Name">
+            <summary>
+            Name of the POI (e.g., "Ben Thanh Market").
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.PoiModel.Latitude">
+            <summary>
+            Latitude coordinate of the POI.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.PoiModel.Longitude">
+            <summary>
+            Longitude coordinate of the POI.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.PoiModel.DescriptionText">
+            <summary>
+            Description text to be narrated via TTS when user approaches the POI.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.Models.PoiModel.Radius">
+            <summary>
+            Radius in meters. When user is within this distance, narration triggers.
+            </summary>
+        </member>
+        <member name="T:VinhKhanhFoodTour.Services.LocationService">
+            <summary>
+            Implementation of ILocationService using MAUI's Geolocation API.
+            Provides device location tracking with permission management.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.LocationService.GetCurrentLocationAsync">
+            <summary>
+            Gets the current device location asynchronously.
+            </summary>
+            <returns>Location object with latitude/longitude, or null if unavailable.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.LocationService.CheckAndRequestPermissionAsync">
+            <summary>
+            Ensures geolocation permission is granted before usage.
+            </summary>
+            <returns>True if permission is granted, false otherwise.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.LocationService.IsLocationServiceEnabledAsync">
+            <summary>
+            Verifies that location services are enabled on the device.
+            </summary>
+            <returns>True if enabled, false otherwise.</returns>
+        </member>
+        <member name="T:VinhKhanhFoodTour.Services.NarrationService">
+            <summary>
+            Implementation of INarrationService.
+            Handles geofence detection, cooldown management, and TTS narration playback.
+            </summary>
+        </member>
+        <member name="F:VinhKhanhFoodTour.Services.NarrationService.COOLDOWN_DURATION_MINUTES">
+            <summary>
+            Cooldown duration in minutes. Prevents repeated narration of the same POI.
+            </summary>
+        </member>
+        <member name="F:VinhKhanhFoodTour.Services.NarrationService._poiLastTriggeredTimes">
+            <summary>
+            Tracks the last triggered time for each POI (by ID).
+            Prevents audio spam by enforcing cooldown period.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.NarrationService.CalculateDistance(System.Double,System.Double,System.Double,System.Double)">
+            <summary>
+            Calculates the distance between two geographic coordinates using the Haversine formula.
+            
+            The Haversine formula calculates the great-circle distance between two points
+            on a sphere given their latitudes and longitudes.
+            
+            Formula:
+            a = sin²(Δφ/2) + cos φ1 ⋅ cos φ2 ⋅ sin²(Δλ/2)
+            c = 2 ⋅ atan2( √a, √(1−a) )
+            d = R ⋅ c
+            
+            where:
+            - φ is latitude, λ is longitude, R is earth's radius (≈6371 km)
+            - Δφ is the difference in latitude
+            - Δλ is the difference in longitude
+            </summary>
+            <param name="userLatitude">User's current latitude in degrees.</param>
+            <param name="userLongitude">User's current longitude in degrees.</param>
+            <param name="poiLatitude">POI's latitude in degrees.</param>
+            <param name="poiLongitude">POI's longitude in degrees.</param>
+            <returns>Distance in meters.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.NarrationService.ShouldTriggerNarration(VinhKhanhFoodTour.Models.PoiModel,System.Double,System.Double)">
+            <summary>
+            Checks if a POI should trigger narration.
+            
+            Conditions for triggering:
+            1. User must be within the POI's radius (geofence check)
+            2. POI must not be in cooldown period (last narration was more than 5 minutes ago)
+            </summary>
+            <param name="poi">The POI to evaluate.</param>
+            <param name="userLatitude">User's current latitude.</param>
+            <param name="userLongitude">User's current longitude.</param>
+            <returns>True if narration should trigger, false otherwise.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.NarrationService.PlayNarrationAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Plays narration text using the MAUI TextToSpeech API.
+            </summary>
+            <param name="text">The text to narrate.</param>
+            <param name="cancellationToken">Token to cancel TTS playback.</param>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.NarrationService.MarkPoiAsTriggered(System.Int32)">
+            <summary>
+            Marks a POI as triggered at the current time, starting its cooldown period.
+            Called after narration is played to enforce cooldown.
+            </summary>
+            <param name="poiId">The ID of the POI that was triggered.</param>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.NarrationService.ResetPoiCooldown(System.Int32)">
+            <summary>
+            Resets the cooldown for a specific POI (useful for testing).
+            </summary>
+            <param name="poiId">The ID of the POI.</param>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.NarrationService.GetLastTriggeredTime(System.Int32)">
+            <summary>
+            Gets the last triggered date/time for a POI.
+            </summary>
+            <param name="poiId">The ID of the POI.</param>
+            <returns>DateTime of last trigger, or null if never triggered.</returns>
+        </member>
+        <member name="M:VinhKhanhFoodTour.Services.NarrationService.DegreesToRadians(System.Double)">
+            <summary>
+            Converts degrees to radians for trigonometric calculations.
+            </summary>
+        </member>
+        <member name="T:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel">
+            <summary>
+            ViewModel for location tracking and POI narration.
+            Implements MVVM pattern with INotifyPropertyChanged for data binding.
+            
+            Responsibilities:
+            1. Manage location tracking timer
+            2. Periodically request user location (every 5 seconds)
+            3. Check each POI for geofence entry
+            4. Trigger narration if conditions are met
+            5. Maintain narration log for UI display
+            </summary>
+        </member>
+        <member name="F:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.LOCATION_UPDATE_INTERVAL_MS">
+            <summary>
+            Location tracking interval in milliseconds.
+            Request location every 5 seconds for PoC.
+            </summary>
+        </member>
+        <member name="P:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.NarrationLog">
+            <summary>
+            Observable collection of narration log entries displayed in the UI.
+            </summary>
+        </member>
+        <member name="F:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel._pointsOfInterest">
+            <summary>
+            Mock list of Points of Interest in Ho Chi Minh City.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.InitializeMockPois">
+            <summary>
+            Initialize mock POIs in Ho Chi Minh City (District 4 area).
+            In a real app, these would be loaded from a database or API.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.StartTrackingAsync">
+            <summary>
+            Starts the location tracking timer and background location updates.
+            Called when user taps the "Start Tracking" button.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.StopTracking">
+            <summary>
+            Stops the location tracking timer and cancels any ongoing TTS playback.
+            Called when user taps the "Stop Tracking" button.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.UpdateLocationAndCheckPoisAsync">
+            <summary>
+            Called every 5 seconds by the location tracking timer.
+            
+            Main workflow:
+            1. Fetch current device location
+            2. Update UI with current coordinates
+            3. Check each POI to see if user entered its geofence
+            4. Trigger narration for POIs that meet all conditions
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.CheckAllPoisAsync(System.Double,System.Double)">
+            <summary>
+            Checks all POIs to determine which ones should trigger narration.
+            For each POI that meets the trigger conditions:
+            1. Log the event
+            2. Mark POI as triggered (start cooldown)
+            3. Play TTS narration
+            </summary>
+            <param name="userLatitude">Current user latitude.</param>
+            <param name="userLongitude">Current user longitude.</param>
+        </member>
+        <member name="M:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.TriggerNarrationAsync(VinhKhanhFoodTour.Models.PoiModel,System.Double,System.Double)">
+            <summary>
+            Executes the complete narration workflow for a triggered POI.
+            </summary>
+            <param name="poi">The POI to narrate.</param>
+            <param name="userLatitude">User's current latitude at time of trigger.</param>
+            <param name="userLongitude">User's current longitude at time of trigger.</param>
+        </member>
+        <member name="M:VinhKhanhFoodTour.ViewModels.LocationTrackingViewModel.Log(System.String)">
+            <summary>
+            Adds a timestamped log message to the narration log.
+            Used for diagnostic and information messages.
+            </summary>
+        </member>
+        <member name="T:VinhKhanhFoodTour.MainPage">
+            <summary>
+            Main page of the Vinh Khanh Food Tour application.
+            Provides UI for location tracking and narration log display.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.MainPage.OnAppearing">
+            <summary>
+            Called when the page is loaded.
+            Initializes the ViewModel and sets up data binding.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.MainPage.OnStartTrackingClicked(System.Object,System.EventArgs)">
+            <summary>
+            Event handler for the "Start Tracking" button.
+            Initiates location tracking and POI monitoring.
+            </summary>
+        </member>
+        <member name="M:VinhKhanhFoodTour.MainPage.OnStopTrackingClicked(System.Object,System.EventArgs)">
+            <summary>
+            Event handler for the "Stop Tracking" button.
+            Stops location tracking and cancels any ongoing TTS playback.
+            </summary>
+        </member>
+    </members>
+</doc>
