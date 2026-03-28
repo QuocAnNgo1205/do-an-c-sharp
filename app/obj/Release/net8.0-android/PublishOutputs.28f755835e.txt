@@ -1,4 +1,0 @@
-E:\code\c#\New folder\do-an-c-sharp\bin\Release\net8.0-android\publish\com.vinhkhanh.foodtour-Signed.aab
-E:\code\c#\New folder\do-an-c-sharp\bin\Release\net8.0-android\publish\com.vinhkhanh.foodtour.aab
-E:\code\c#\New folder\do-an-c-sharp\bin\Release\net8.0-android\publish\com.vinhkhanh.foodtour-Signed.apk
-E:\code\c#\New folder\do-an-c-sharp\bin\Release\net8.0-android\publish\_Microsoft.Android.Resource.Designer.dll
