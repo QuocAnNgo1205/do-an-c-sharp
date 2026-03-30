@@ -34,6 +34,8 @@ namespace VinhKhanhFoodTour.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public string? RejectionReason { get; set; }
+
         // Navigation Properties
         [ForeignKey("OwnerId")]
         public virtual User? Owner { get; set; }

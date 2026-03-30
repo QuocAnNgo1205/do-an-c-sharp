@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
@@ -23,20 +24,23 @@ builder.Services.AddSwaggerGen(c =>
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
-        Description = "Nhap token JWT vao day (khong can go 'Bearer ').",
+        Description = "Nhap JWT token vao day (khong can go tu 'Bearer').",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT"
     });
 
+    // .NET 10 + OpenAPI 4: phai truyen `document` vao OpenApiSecuritySchemeReference,
+    // neu khong Swagger UI se hien "Authorized" nhung KHONG gui header Authorization.
     c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecuritySchemeReference("Bearer"),
+            new OpenApiSecuritySchemeReference("Bearer", document),
             new List<string>()
         }
     });
+
 });
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -51,6 +55,7 @@ builder.Services.AddAuthentication(options =>
 {
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
+    options.IncludeErrorDetails = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -62,13 +67,67 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key),
         NameClaimType = ClaimTypes.Name,
         RoleClaimType = ClaimTypes.Role,
-        ClockSkew = TimeSpan.Zero
+        ClockSkew = TimeSpan.FromMinutes(5)
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var authHeader = context.Request.Headers.Authorization.ToString();
+            if (!string.IsNullOrWhiteSpace(authHeader))
+            {
+                var token = authHeader.Trim();
+
+                while (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    token = token["Bearer ".Length..].Trim();
+                }
+
+                context.Token = token;
+                Console.WriteLine(
+                    $"[JWT] {context.Request.Method} {context.Request.Path} — co Authorization, do dai token (sau Bearer) = {token.Length}");
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"[JWT] {context.Request.Method} {context.Request.Path} — KHONG co header Authorization");
+            }
+
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"[JWT AUTH FAILED] {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            var sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            var roles = string.Join(",", context.Principal?.FindAll(ClaimTypes.Role).Select(c => c.Value) ?? []);
+            Console.WriteLine($"[JWT OK] User sub={sub}; roles=[{roles}]");
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            var path = context.HttpContext.Request.Path;
+            var hasAuth = context.HttpContext.Request.Headers.Authorization.Count > 0;
+            Console.WriteLine(
+                $"[JWT CHALLENGE] Path={path}; HasAuthorizationHeader={hasAuth}; " +
+                $"Error='{context.Error}'; Description='{context.ErrorDescription}' " +
+                $"(rong = thuong la thieu token hop le hoac chua gui header)");
+            return Task.CompletedTask;
+        }
     };
 });
 
 var app = builder.Build();
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(options =>
+{
+    options.ConfigObject.PersistAuthorization = true;
+});
 
 // Seed the database
 using (var scope = app.Services.CreateScope())
