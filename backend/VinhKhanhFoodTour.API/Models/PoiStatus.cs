@@ -31,7 +31,7 @@ namespace VinhKhanhFoodTour.Models
         public double TriggerRadius { get; set; } = 20.0;
 
         public PoiStatus Status { get; set; } = PoiStatus.Pending;
-
+        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public string? RejectionReason { get; set; }

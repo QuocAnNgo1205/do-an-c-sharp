@@ -17,6 +17,7 @@ namespace VinhKhanhFoodTour.Models
 
         [Required]
         [MaxLength(255)]
+
         public string Title { get; set; } = string.Empty;
 
         public string? Description { get; set; } // Nội dung văn bản cho Text-to-Speech

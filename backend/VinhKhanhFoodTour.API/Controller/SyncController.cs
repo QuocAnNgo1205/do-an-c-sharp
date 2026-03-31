@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using VinhKhanhFoodTour.Data;
-using VinhKhanhFoodTour.Models;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text.Json;
+using VinhKhanhFoodTour.Data;
+using VinhKhanhFoodTour.Models;
 
 namespace VinhKhanhFoodTour.API.Controllers
 {
@@ -12,103 +14,178 @@ namespace VinhKhanhFoodTour.API.Controllers
     public class SyncController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _env;
 
-        public SyncController(AppDbContext context)
+        public SyncController(AppDbContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
         }
 
-        // GET: api/v1/sync/pois
-        [HttpGet("pois")]
-        public async Task<IActionResult> GetPoisForSync()
+        // API: Check Latest Version of Approved POIs
+        [HttpGet("public/sync/version")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetLatestVersion()
         {
-            // Chỉ lấy các quán đã được Admin duyệt (Approved)
-            var pois = await _context.Pois
-                .Where(p => p.Status == PoiStatus.Approved)
-                .Select(p => new
+            try
+            {
+                // Query the Pois table for all Approved POIs
+                var approvedPois = await _context.Pois
+                    .Where(p => p.Status == PoiStatus.Approved)
+                    .ToListAsync();
+
+                string versionString;
+
+                if (approvedPois.Count == 0)
                 {
-                    p.Id,
-                    p.Name,
-                    p.Latitude,
-                    p.Longitude,
-                    p.TriggerRadius,
-                    // Lấy luôn danh sách đa ngôn ngữ đi kèm
+                    // If there are no approved POIs, return default version
+                    versionString = "1.0.0";
+                }
+                else
+                {
+                    // Find the maximum LastUpdated DateTime
+                    var maxLastUpdated = approvedPois.Max(p => p.LastUpdated);
+                    // Format as "yyyyMMddHHmmss"
+                    versionString = maxLastUpdated.ToString("yyyyMMddHHmmss");
+                }
+
+                return Ok(new { version = versionString });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi kiểm tra phiên bản: " + ex.Message });
+            }
+        }
+
+        // API: Generate and Download Offline ZIP Pack
+        [HttpGet("public/sync/download-zip")]
+        [AllowAnonymous]
+        public async Task<IActionResult> DownloadOfflineZip()
+        {
+            try
+            {
+                // Asynchronously fetch all Approved POIs including their Translations
+                var approvedPois = await _context.Pois
+                    .Where(p => p.Status == PoiStatus.Approved)
+                    .Include(p => p.Translations)
+                    .ToListAsync();
+
+                // Map to anonymous objects to avoid object cycles
+                var poisData = approvedPois.Select(p => new
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Latitude = p.Latitude,
+                    Longitude = p.Longitude,
+                    TriggerRadius = p.TriggerRadius,
                     Translations = p.Translations.Select(t => new
                     {
-                        t.LanguageCode,
-                        t.Title,
-                        t.Description,
-                        t.AudioFilePath,
-                        t.ImageUrl
+                        Id = t.Id,
+                        LanguageCode = t.LanguageCode,
+                        Title = t.Title,
+                        Description = t.Description,
+                        ImageUrl = t.ImageUrl,
+                        AudioFilePath = t.AudioFilePath
                     }).ToList()
-                })
-                .ToListAsync();
+                }).ToList();
 
-            // Trả về một object bọc ngoài cho chuẩn format API
-            return Ok(new
-            {
-                Version = DateTime.UtcNow.ToString("yyyyMMddHHmmss"), // Tự động tạo version bằng timestamp
-                TotalCount = pois.Count,
-                Data = pois
-            });
-        }
-        // GET: api/v1/sync/version
-        [HttpGet("version")]
-        public async Task<IActionResult> CheckVersion()
-        {
-            // Lấy thời gian tạo/cập nhật mới nhất của quán ăn trong hệ thống
-            var latestPoi = await _context.Pois
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
+                // Serialize to JSON with formatting
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var poisJson = JsonSerializer.Serialize(poisData, jsonOptions);
 
-            if (latestPoi == null) return Ok(new { Version = "1.0.0" }); // DB rỗng
-
-            // Ép ra chuỗi định dạng yyyyMMddHHmmss để làm mã Version
-            string currentVersion = latestPoi.CreatedAt.ToString("yyyyMMddHHmmss");
-
-            return Ok(new { Version = currentVersion });
-        }
-        // GET: api/v1/sync/download-zip
-        [HttpGet("download-zip")]
-        public IActionResult DownloadOfflinePack()
-        {
-            using var memoryStream = new MemoryStream();
-
-            // 1. Tạo file ZIP trên RAM
-            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
-            {
-                // Giả lập nhét 1 file mp3 tiếng Việt vào thư mục Audio/vi
-                var viAudio = archive.CreateEntry("Audio/vi/oc_oanh_vi.mp3");
-                using (var entryStream = viAudio.Open())
-                using (var streamWriter = new StreamWriter(entryStream))
+                // Create in-memory ZIP archive
+                using (var memoryStream = new MemoryStream())
                 {
-                    streamWriter.Write("Đây là dữ liệu nhị phân giả lập của file âm thanh tiếng Việt...");
-                }
+                    using (var zipArchive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
+                    {
+                        // Add pois.json to the ZIP
+                        var poisJsonEntry = zipArchive.CreateEntry("pois.json");
+                        using (var writer = new StreamWriter(poisJsonEntry.Open()))
+                        {
+                            await writer.WriteAsync(poisJson);
+                        }
 
-                // Giả lập nhét 1 file mp3 tiếng Anh vào thư mục Audio/en
-                var enAudio = archive.CreateEntry("Audio/en/oc_oanh_en.mp3");
-                using (var entryStream = enAudio.Open())
-                using (var streamWriter = new StreamWriter(entryStream))
-                {
-                    streamWriter.Write("This is simulated binary data for English audio...");
+                        // Iterate through translations and add media files
+                        foreach (var poi in approvedPois)
+                        {
+                            foreach (var translation in poi.Translations)
+                            {
+                                // Handle ImageUrl
+                                if (!string.IsNullOrEmpty(translation.ImageUrl))
+                                {
+                                    await AddMediaFileToZip(zipArchive, translation.ImageUrl);
+                                }
+
+                                // Handle AudioFilePath
+                                if (!string.IsNullOrEmpty(translation.AudioFilePath))
+                                {
+                                    await AddMediaFileToZip(zipArchive, translation.AudioFilePath);
+                                }
+                            }
+                        }
+                    }
+
+                    // Convert stream to byte array
+                    var zipBytes = memoryStream.ToArray();
+
+                    // Calculate SHA-256 hash
+                    using (var sha256 = SHA256.Create())
+                    {
+                        var hashBytes = sha256.ComputeHash(zipBytes);
+                        var hashHex = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
+
+                        // Add hash to response headers
+                        Response.Headers.Append("X-SHA256-Hash", hashHex);
+                    }
+
+                    // Return ZIP file
+                    return File(zipBytes, "application/zip", "VinhKhanh_OfflinePack.zip");
                 }
             }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi tạo gói offline: " + ex.Message });
+            }
+        }
 
-            memoryStream.Position = 0;
+        // Helper: Add media file to ZIP archive
+        private async Task AddMediaFileToZip(ZipArchive zipArchive, string relativePath)
+        {
+            try
+            {
+                // Construct physical file path from relative path
+                if (string.IsNullOrEmpty(relativePath))
+                    return;
 
-            // 2. Thuật toán băm SHA-256 (Điểm cộng cực mạnh cho đồ án)
-            using var sha256 = SHA256.Create();
-            var hashBytes = sha256.ComputeHash(memoryStream);
-            var hashString = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                // Remove leading slash if present
+                var cleanPath = relativePath.TrimStart('/');
+                var physicalPath = Path.Combine(_env.WebRootPath, cleanPath);
 
-            // Reset lại vị trí stream để chuẩn bị tải xuống
-            memoryStream.Position = 0;
+                // Verify file exists
+                if (!System.IO.File.Exists(physicalPath))
+                {
+                    // Log and ignore if file is missing
+                    return;
+                }
 
-            // 3. Đính kèm mã SHA-256 vào Header của Response để Mobile App đọc được
-            Response.Headers.Append("X-SHA256-Hash", hashString);
+                // Add file to ZIP using relative path as entry name
+                var zipEntryName = cleanPath.Replace("\\", "/");
+                var zipEntry = zipArchive.CreateEntry(zipEntryName);
 
-            // Trả về file ZIP
-            return File(memoryStream.ToArray(), "application/zip", "VinhKhanh_OfflinePack.zip");
+                using (var fileStream = System.IO.File.OpenRead(physicalPath))
+                {
+                    using (var zipStream = zipEntry.Open())
+                    {
+                        await fileStream.CopyToAsync(zipStream);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't fail the entire ZIP creation
+                // In production, use ILogger for proper logging
+                System.Diagnostics.Debug.WriteLine($"Lỗi khi thêm file media vào ZIP: {relativePath} - {ex.Message}");
+            }
         }
     }
 }

@@ -3,10 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using VinhKhanhFoodTour.Data; // Chú ý: Namespace này phải khớp với chỗ ông để AppDbContext
-using VinhKhanhFoodTour.Models; // Chú ý: Namespace chứa class Poi, PoiTranslation
-using VinhKhanhFoodTour.DTOs; // Namespace chứa các DTO như PoiDto, PoiTranslationDto
-
+using VinhKhanhFoodTour.Data;
+using VinhKhanhFoodTour.Models;
+using VinhKhanhFoodTour.DTOs;
 namespace VinhKhanhFoodTour.API.Controllers
 {
     [Route("api/v1/[controller]")]
@@ -15,10 +14,12 @@ namespace VinhKhanhFoodTour.API.Controllers
     public class PoiController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _env;
 
-        public PoiController(AppDbContext context)
+        public PoiController(AppDbContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
         }
 
         // API: Thêm một quán ăn mới
@@ -43,6 +44,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                     Longitude = request.Longitude,
                     Status = PoiStatus.Pending, // Mặc định chờ duyệt
                     TriggerRadius = 50,  // Bán kính kích hoạt 50m
+                    LastUpdated = DateTime.UtcNow,
                     Translations = new List<PoiTranslation>
                     {
                         new PoiTranslation
@@ -53,9 +55,9 @@ namespace VinhKhanhFoodTour.API.Controllers
                         }
                     }
                 };
-
                 // 2. Lưu vào Database
                 _context.Pois.Add(newPoi);
+
                 await _context.SaveChangesAsync();
 
                 return Ok(new
@@ -121,6 +123,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                 }
 
                 poi.Status = PoiStatus.Approved;
+                poi.LastUpdated = DateTime.UtcNow;
                 _context.Pois.Update(poi);
                 await _context.SaveChangesAsync();
 
@@ -152,6 +155,7 @@ namespace VinhKhanhFoodTour.API.Controllers
 
                 poi.Status = PoiStatus.Rejected;
                 poi.RejectionReason = request.Reason;
+                poi.LastUpdated = DateTime.UtcNow;
                 _context.Pois.Update(poi);
                 await _context.SaveChangesAsync();
 
@@ -245,6 +249,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                 poi.Longitude = request.Longitude;
                 poi.Status = PoiStatus.Pending;
                 poi.RejectionReason = null;
+                poi.LastUpdated = DateTime.UtcNow;
 
                 _context.Pois.Update(poi);
                 await _context.SaveChangesAsync();
@@ -402,6 +407,143 @@ namespace VinhKhanhFoodTour.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Message = "Lỗi khi lấy danh sách quán gần đây: " + ex.Message });
+            }
+        }
+
+        // API: Chủ quán tải lên tệp media (ảnh/âm thanh) cho bản dịch của quán (Owner only)
+        [HttpPost("owner/{id}/translations/{languageCode}/media")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> UploadMediaForTranslation(int id, string languageCode, IFormFile? imageFile, IFormFile? audioFile)
+        {
+            try
+            {
+                // 1. Extract current user's ID from JWT claims
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+                {
+                    return Unauthorized(new { Message = "Không thể xác định người dùng từ token." });
+                }
+
+                // 2. Find the POI by id asynchronously
+                var poi = await _context.Pois.FindAsync(id);
+                if (poi == null)
+                {
+                    return NotFound(new { Message = $"Không tìm thấy quán với ID: {id}" });
+                }
+
+                // 3. Verify ownership
+                if (poi.OwnerId != currentUserId)
+                {
+                    return Forbid();
+                }
+
+                // 4. Find the PoiTranslation associated with this POI and the given languageCode
+                var translation = await _context.PoiTranslations
+                    .FirstOrDefaultAsync(t => t.PoiId == id && t.LanguageCode == languageCode);
+
+                if (translation == null)
+                {
+                    return NotFound(new { Message = $"Không tìm thấy bản dịch cho ngôn ngữ: {languageCode}" });
+                }
+
+                // 5. Handle image file upload if provided
+                if (imageFile != null && imageFile.Length > 0)
+                {
+                    // Validate extension
+                    var allowedImageExtensions = new[] { ".jpg", ".jpeg", ".png" };
+                    var imageExtension = Path.GetExtension(imageFile.FileName).ToLower();
+
+                    if (!allowedImageExtensions.Contains(imageExtension))
+                    {
+                        return BadRequest(new { Message = "Định dạng ảnh không hợp lệ. Chỉ cho phép: .jpg, .jpeg, .png" });
+                    }
+
+                    // Generate unique filename using GUID
+                    var uniqueImageFileName = $"{Guid.NewGuid()}{imageExtension}";
+                    var imageDirectory = Path.Combine(_env.WebRootPath, "uploads", "images");
+
+                    // Ensure the directory exists
+                    if (!Directory.Exists(imageDirectory))
+                    {
+                        Directory.CreateDirectory(imageDirectory);
+                    }
+
+                    var imageFilePath = Path.Combine(imageDirectory, uniqueImageFileName);
+
+                    // Save file asynchronously with using statement
+                    using (var fileStream = new FileStream(imageFilePath, FileMode.Create))
+                    {
+                        await imageFile.CopyToAsync(fileStream);
+                    }
+
+                    // Update the translation's ImageUrl
+                    translation.ImageUrl = $"/uploads/images/{uniqueImageFileName}";
+                }
+
+                // 6. Handle audio file upload if provided
+                if (audioFile != null && audioFile.Length > 0)
+                {
+                    // Validate extension
+                    var allowedAudioExtensions = new[] { ".mp3", ".wav" };
+                    var audioExtension = Path.GetExtension(audioFile.FileName).ToLower();
+
+                    if (!allowedAudioExtensions.Contains(audioExtension))
+                    {
+                        return BadRequest(new { Message = "Định dạng âm thanh không hợp lệ. Chỉ cho phép: .mp3, .wav" });
+                    }
+
+                    // Generate unique filename using GUID
+                    var uniqueAudioFileName = $"{Guid.NewGuid()}{audioExtension}";
+                    var audioDirectory = Path.Combine(_env.WebRootPath, "uploads", "audio");
+
+                    // Ensure the directory exists
+                    if (!Directory.Exists(audioDirectory))
+                    {
+                        Directory.CreateDirectory(audioDirectory);
+                    }
+
+                    var audioFilePath = Path.Combine(audioDirectory, uniqueAudioFileName);
+
+                    // Save file asynchronously with using statement
+                    using (var fileStream = new FileStream(audioFilePath, FileMode.Create))
+                    {
+                        await audioFile.CopyToAsync(fileStream);
+                    }
+
+                    // Update the translation's AudioFilePath
+                    translation.AudioFilePath = $"/uploads/audio/{uniqueAudioFileName}";
+                }
+
+                // Check if at least one file was uploaded
+                if (imageFile == null && audioFile == null)
+                {
+                    return BadRequest(new { Message = "Vui lòng cung cấp ít nhất một tệp ảnh hoặc âm thanh." });
+                }
+
+                // 7. Save changes to database
+                _context.PoiTranslations.Update(translation);
+                await _context.SaveChangesAsync();
+
+                // Return Ok with updated ImageUrl and AudioFilePath
+                return Ok(new
+                {
+                    Message = "Đã tải lên tệp media thành công!",
+                    ImageUrl = translation.ImageUrl,
+                    AudioFilePath = translation.AudioFilePath
+                });
+            }
+            catch (IOException ioEx)
+            {
+                return StatusCode(500, new { Message = "Lỗi tệp hệ thống: " + ioEx.Message });
+            }
+            catch (DbUpdateException dbEx)
+            {
+                return StatusCode(500, new { Message = "Lỗi cơ sở dữ liệu: " + dbEx.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi tải lên tệp media: " + ex.Message });
             }
         }
 
