@@ -1,0 +1,8 @@
+# Bỏ qua các thư mục biên dịch của .NET
+[Oo]bj/
+[Bb]in/
+
+# Bỏ qua cấu hình cá nhân của IDE
+.vs/
+.vscode/
+*.user
