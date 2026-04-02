@@ -6,6 +6,8 @@ using System.Security.Claims;
 using VinhKhanhFoodTour.Data;
 using VinhKhanhFoodTour.Models;
 using VinhKhanhFoodTour.DTOs;
+using VinhKhanhFoodTour.API;
+using NetTopologySuite.Geometries;
 namespace VinhKhanhFoodTour.API.Controllers
 {
     [Route("api/v1/[controller]")]
@@ -35,13 +37,15 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng từ token." });
                 }
 
-                // 1. Tạo thực thể POI (Quán ăn)
+                // 1. Convert Latitude/Longitude from DTO to Point using SpatialHelper
+                var location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
+
+                // 2. Tạo thực thể POI (Quán ăn)
                 var newPoi = new Poi
                 {
                     OwnerId = ownerId,
                     Name = request.Name,
-                    Latitude = request.Latitude,
-                    Longitude = request.Longitude,
+                    Location = location,
                     Status = PoiStatus.Pending, // Mặc định chờ duyệt
                     TriggerRadius = 50,  // Bán kính kích hoạt 50m
                     LastUpdated = DateTime.UtcNow,
@@ -55,7 +59,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                         }
                     }
                 };
-                // 2. Lưu vào Database
+                // 3. Lưu vào Database
                 _context.Pois.Add(newPoi);
 
                 await _context.SaveChangesAsync();
@@ -85,8 +89,8 @@ namespace VinhKhanhFoodTour.API.Controllers
                     {
                         Id = p.Id,
                         Name = p.Name,
-                        Latitude = p.Latitude,
-                        Longitude = p.Longitude,
+                        Latitude = SpatialHelper.GetLatitude(p.Location),
+                        Longitude = SpatialHelper.GetLongitude(p.Location),
                         Status = p.Status,
                         RejectionReason = p.RejectionReason,
                         Translations = p.Translations.Select(t => new PoiTranslationDto
@@ -185,12 +189,13 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng." });
                 }
 
+                var location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
+
                 var newPoi = new Poi
                 {
                     OwnerId = ownerId,
                     Name = request.Name,
-                    Latitude = request.Latitude,
-                    Longitude = request.Longitude,
+                    Location = location,
                     Status = PoiStatus.Pending,
                     TriggerRadius = 50,
                     Translations = new List<PoiTranslation>
@@ -245,8 +250,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                 }
 
                 poi.Name = request.Name;
-                poi.Latitude = request.Latitude;
-                poi.Longitude = request.Longitude;
+                poi.Location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
                 poi.Status = PoiStatus.Pending;
                 poi.RejectionReason = null;
                 poi.LastUpdated = DateTime.UtcNow;
@@ -286,8 +290,8 @@ namespace VinhKhanhFoodTour.API.Controllers
                     {
                         Id = p.Id,
                         Name = p.Name,
-                        Latitude = p.Latitude,
-                        Longitude = p.Longitude,
+                        Latitude = SpatialHelper.GetLatitude(p.Location),
+                        Longitude = SpatialHelper.GetLongitude(p.Location),
                         Status = p.Status,
                         RejectionReason = p.RejectionReason,
                         Translations = p.Translations.Select(t => new PoiTranslationDto
@@ -321,8 +325,8 @@ namespace VinhKhanhFoodTour.API.Controllers
                     {
                         Id = p.Id,
                         Name = p.Name,
-                        Latitude = p.Latitude,
-                        Longitude = p.Longitude,
+                        Latitude = SpatialHelper.GetLatitude(p.Location),
+                        Longitude = SpatialHelper.GetLongitude(p.Location),
                         Status = p.Status,
                         RejectionReason = p.RejectionReason,
                         Translations = p.Translations.Select(t => new PoiTranslationDto
@@ -356,8 +360,8 @@ namespace VinhKhanhFoodTour.API.Controllers
                     {
                         Id = p.Id,
                         Name = p.Name,
-                        Latitude = p.Latitude,
-                        Longitude = p.Longitude
+                        Latitude = SpatialHelper.GetLatitude(p.Location),
+                        Longitude = SpatialHelper.GetLongitude(p.Location)
                     })
                     .ToListAsync();
 
@@ -370,21 +374,26 @@ namespace VinhKhanhFoodTour.API.Controllers
         }
 
         // API: Lấy danh sách các quán ăn gần người dùng (Public - dựa trên vị trí)
+        // Spatial query performed at the database level using NetTopologySuite
         [HttpGet("public/nearby")]
         [AllowAnonymous]
         public async Task<IActionResult> GetNearbyPois([FromQuery] double userLat, [FromQuery] double userLng, [FromQuery] double radiusInMeters = 50)
         {
             try
             {
-                // Lấy tất cả các quán đã được duyệt
-                var approvedPois = await _context.Pois
-                    .Where(p => p.Status == PoiStatus.Approved)
+                // Create a Point from user's coordinates with SRID 4326 (WGS84)
+                var userLocation = SpatialHelper.CreatePoint(userLat, userLng);
+
+                // Query using spatial distance at database level
+                // SQL Server's STDistance() method returns distance in meters (for geography type)
+                var nearbyPois = await _context.Pois
+                    .Where(p => p.Status == PoiStatus.Approved && p.Location.Distance(userLocation) <= radiusInMeters)
                     .Select(p => new PoiDto
                     {
                         Id = p.Id,
                         Name = p.Name,
-                        Latitude = p.Latitude,
-                        Longitude = p.Longitude,
+                        Latitude = SpatialHelper.GetLatitude(p.Location),
+                        Longitude = SpatialHelper.GetLongitude(p.Location),
                         Status = p.Status,
                         RejectionReason = p.RejectionReason,
                         Translations = p.Translations.Select(t => new PoiTranslationDto
@@ -396,11 +405,6 @@ namespace VinhKhanhFoodTour.API.Controllers
                         }).ToList()
                     })
                     .ToListAsync();
-
-                // Lọc các quán nằm trong bán kính
-                var nearbyPois = approvedPois
-                    .Where(p => CalculateDistance(userLat, userLng, p.Latitude, p.Longitude) <= radiusInMeters)
-                    .ToList();
 
                 return Ok(nearbyPois);
             }
@@ -545,30 +549,6 @@ namespace VinhKhanhFoodTour.API.Controllers
             {
                 return StatusCode(500, new { Message = "Lỗi khi tải lên tệp media: " + ex.Message });
             }
-        }
-
-        // Helper: Tính toán khoảng cách giữa hai tọa độ bằng công thức Haversine (đơn vị: mét)
-        private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
-        {
-            const double EarthRadiusMeters = 6371000; // Bán kính Trái Đất tính bằng mét
-
-            var dLat = DegreesToRadians(lat2 - lat1);
-            var dLon = DegreesToRadians(lon2 - lon1);
-
-            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                    Math.Cos(DegreesToRadians(lat1)) * Math.Cos(DegreesToRadians(lat2)) *
-                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            var distance = EarthRadiusMeters * c;
-
-            return distance;
-        }
-
-        // Helper: Chuyển đổi độ sang radian
-        private double DegreesToRadians(double degrees)
-        {
-            return degrees * Math.PI / 180.0;
         }
     }
 

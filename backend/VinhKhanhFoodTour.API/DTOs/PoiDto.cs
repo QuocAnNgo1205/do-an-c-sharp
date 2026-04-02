@@ -7,8 +7,17 @@ namespace VinhKhanhFoodTour.DTOs
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// Latitude of the POI (extracted from Location Point for API response)
+        /// </summary>
         public double Latitude { get; set; }
+        
+        /// <summary>
+        /// Longitude of the POI (extracted from Location Point for API response)
+        /// </summary>
         public double Longitude { get; set; }
+        
         public PoiStatus Status { get; set; }
         public string? RejectionReason { get; set; }
 

@@ -53,8 +53,12 @@ namespace VinhKhanhFoodTour.Data
             {
                 entity.HasKey(p => p.Id);
                 entity.Property(p => p.Name).IsRequired().HasMaxLength(255);
-                entity.Property(p => p.Latitude).IsRequired();
-                entity.Property(p => p.Longitude).IsRequired();
+                
+                // Configure spatial property with SRID 4326 (WGS84 - latitude/longitude)
+                entity.Property(p => p.Location)
+                    .IsRequired()
+                    .HasColumnType("geography");
+                
                 entity.Property(p => p.TriggerRadius).HasDefaultValue(20.0);
                 entity.Property(p => p.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 

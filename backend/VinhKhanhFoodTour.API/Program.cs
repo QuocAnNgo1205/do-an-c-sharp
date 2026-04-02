@@ -7,12 +7,17 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using NetTopologySuite.Geometries;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+    options
+        .UseSqlServer(
+            builder.Configuration.GetConnectionString("DefaultConnection"),
+            x => x.UseNetTopologySuite()
+        )
 );
 
 builder.Services.AddControllers();

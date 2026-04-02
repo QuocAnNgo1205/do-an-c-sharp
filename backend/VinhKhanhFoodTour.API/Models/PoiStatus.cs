@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using NetTopologySuite.Geometries;
 
 namespace VinhKhanhFoodTour.Models
 {
@@ -23,10 +24,7 @@ namespace VinhKhanhFoodTour.Models
         public string Name { get; set; } = string.Empty;
 
         [Required]
-        public double Latitude { get; set; }
-
-        [Required]
-        public double Longitude { get; set; }
+        public Point Location { get; set; } = null!;
 
         public double TriggerRadius { get; set; } = 20.0;
 

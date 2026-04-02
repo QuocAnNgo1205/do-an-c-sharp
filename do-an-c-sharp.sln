@@ -1,10 +1,12 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.5.2.0
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11626.88 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VinhKhanhFoodTour.API", "backend\VinhKhanhFoodTour.API\VinhKhanhFoodTour.API.csproj", "{BDCC1B33-7D34-0A57-8045-7EAA3DE786D8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VinhKhanhFoodTour.AdminPortal", "backend\VinhKhanhFoodTour.AdminPortal\VinhKhanhFoodTour.AdminPortal.csproj", "{7EB11A2C-2937-4A58-A848-9E594C4B33DC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,12 +18,17 @@ Global
 		{BDCC1B33-7D34-0A57-8045-7EAA3DE786D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDCC1B33-7D34-0A57-8045-7EAA3DE786D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDCC1B33-7D34-0A57-8045-7EAA3DE786D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7EB11A2C-2937-4A58-A848-9E594C4B33DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EB11A2C-2937-4A58-A848-9E594C4B33DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EB11A2C-2937-4A58-A848-9E594C4B33DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EB11A2C-2937-4A58-A848-9E594C4B33DC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{BDCC1B33-7D34-0A57-8045-7EAA3DE786D8} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
+		{7EB11A2C-2937-4A58-A848-9E594C4B33DC} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {5292022E-40B3-4C71-9A43-7D9F3CF9F559}

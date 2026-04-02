@@ -50,18 +50,16 @@ namespace VinhKhanhFoodTour.Data
                 new Poi
                 {
                     Name = "Ốc Oanh",
-                    Latitude = 10.7605,
-                    Longitude = 106.6900,
                     Status = PoiStatus.Approved,
+                    Location = new NetTopologySuite.Geometries.Point(106.123456, 10.123456) { SRID = 4326 },
                     TriggerRadius = 20.0,
                     OwnerId = ownerOanh.Id
                 },
                 new Poi
                 {
                     Name = "Ốc Vũ",
-                    Latitude = 10.7610,
-                    Longitude = 106.6905,
                     Status = PoiStatus.Approved,
+                    Location = new NetTopologySuite.Geometries.Point(106.125678, 10.125789) { SRID = 4326 },
                     TriggerRadius = 20.0,
                     OwnerId = ownerVu.Id
                 }

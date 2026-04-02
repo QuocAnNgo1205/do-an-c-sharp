@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using NetTopologySuite.Geometries;
 using VinhKhanhFoodTour.Data;
 
 #nullable disable
@@ -12,8 +13,8 @@ using VinhKhanhFoodTour.Data;
 namespace VinhKhanhFoodTour.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260331155646_UpdatePoiMediaFields")]
-    partial class UpdatePoiMediaFields
+    [Migration("20260402184020_InitialCreateSpatial")]
+    partial class InitialCreateSpatial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -66,11 +67,12 @@ namespace VinhKhanhFoodTour.API.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETUTCDATE()");
 
-                    b.Property<double>("Latitude")
-                        .HasColumnType("float");
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("datetime2");
 
-                    b.Property<double>("Longitude")
-                        .HasColumnType("float");
+                    b.Property<Point>("Location")
+                        .IsRequired()
+                        .HasColumnType("geography");
 
                     b.Property<string>("Name")
                         .IsRequired()

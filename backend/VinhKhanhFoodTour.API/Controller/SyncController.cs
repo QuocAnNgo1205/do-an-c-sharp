@@ -75,8 +75,8 @@ namespace VinhKhanhFoodTour.API.Controllers
                 {
                     Id = p.Id,
                     Name = p.Name,
-                    Latitude = p.Latitude,
-                    Longitude = p.Longitude,
+                    Latitude = p.Location.Y,  // Vĩ độ
+                    Longitude = p.Location.X, // Kinh độ
                     TriggerRadius = p.TriggerRadius,
                     Translations = p.Translations.Select(t => new
                     {
