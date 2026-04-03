@@ -8,6 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using NetTopologySuite.Geometries;
+using VinhKhanhFoodTour.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 builder.Services.AddControllers();
+builder.Services.AddScoped<ISyncService, SyncService>();
+builder.Services.AddScoped<ISyncOrchestrator, SyncOrchestrator>();
+builder.Services.AddScoped<IMediaService, MediaService>();
+builder.Services.AddScoped<IPoiService, PoiService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

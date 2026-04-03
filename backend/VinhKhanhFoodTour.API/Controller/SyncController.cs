@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.IO.Compression;
-using System.Security.Cryptography;
-using System.Text.Json;
+using System.Security.Claims;
 using VinhKhanhFoodTour.Data;
+using VinhKhanhFoodTour.DTOs;
+using VinhKhanhFoodTour.API.Services;
 using VinhKhanhFoodTour.Models;
 
 namespace VinhKhanhFoodTour.API.Controllers
@@ -15,17 +15,23 @@ namespace VinhKhanhFoodTour.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _env;
+        private readonly ISyncService _syncService;
+        private readonly string _offlinePacksDirectory;
+        private const string PACK_FILENAME = "VinhKhanh_OfflinePack.zip";
+        private const string HASH_FILENAME = "VinhKhanh_OfflinePack.sha256.txt";
 
-        public SyncController(AppDbContext context, IWebHostEnvironment env)
+        public SyncController(AppDbContext context, IWebHostEnvironment env, ISyncService syncService)
         {
             _context = context;
             _env = env;
+            _syncService = syncService;
+            _offlinePacksDirectory = Path.Combine(_env.WebRootPath, "offline-packs");
         }
 
         // API: Check Latest Version of Approved POIs
         [HttpGet("public/sync/version")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetLatestVersion()
+        public async Task<IActionResult> GetLatestSyncVersion()
         {
             try
             {
@@ -64,127 +70,185 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                // Asynchronously fetch all Approved POIs including their Translations
-                var approvedPois = await _context.Pois
-                    .Where(p => p.Status == PoiStatus.Approved)
-                    .Include(p => p.Translations)
-                    .ToListAsync();
-
-                // Map to anonymous objects to avoid object cycles
-                var poisData = approvedPois.Select(p => new
+                var manifest = await _syncService.GetManifestAsync();
+                var packPath = _syncService.GetOfflinePackPath();
+                if (manifest == null || !System.IO.File.Exists(packPath))
                 {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Latitude = p.Location.Y,  // Vĩ độ
-                    Longitude = p.Location.X, // Kinh độ
-                    TriggerRadius = p.TriggerRadius,
-                    Translations = p.Translations.Select(t => new
-                    {
-                        Id = t.Id,
-                        LanguageCode = t.LanguageCode,
-                        Title = t.Title,
-                        Description = t.Description,
-                        ImageUrl = t.ImageUrl,
-                        AudioFilePath = t.AudioFilePath
-                    }).ToList()
-                }).ToList();
+                    return NotFound(new { Message = "Offline pack is not available. Please contact the admin to generate the pack." });
+                }
 
-                // Serialize to JSON with formatting
-                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-                var poisJson = JsonSerializer.Serialize(poisData, jsonOptions);
-
-                // Create in-memory ZIP archive
-                using (var memoryStream = new MemoryStream())
+                try
                 {
-                    using (var zipArchive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
-                    {
-                        // Add pois.json to the ZIP
-                        var poisJsonEntry = zipArchive.CreateEntry("pois.json");
-                        using (var writer = new StreamWriter(poisJsonEntry.Open()))
-                        {
-                            await writer.WriteAsync(poisJson);
-                        }
-
-                        // Iterate through translations and add media files
-                        foreach (var poi in approvedPois)
-                        {
-                            foreach (var translation in poi.Translations)
-                            {
-                                // Handle ImageUrl
-                                if (!string.IsNullOrEmpty(translation.ImageUrl))
-                                {
-                                    await AddMediaFileToZip(zipArchive, translation.ImageUrl);
-                                }
-
-                                // Handle AudioFilePath
-                                if (!string.IsNullOrEmpty(translation.AudioFilePath))
-                                {
-                                    await AddMediaFileToZip(zipArchive, translation.AudioFilePath);
-                                }
-                            }
-                        }
-                    }
-
-                    // Convert stream to byte array
-                    var zipBytes = memoryStream.ToArray();
-
-                    // Calculate SHA-256 hash
-                    using (var sha256 = SHA256.Create())
-                    {
-                        var hashBytes = sha256.ComputeHash(zipBytes);
-                        var hashHex = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
-
-                        // Add hash to response headers
-                        Response.Headers.Append("X-SHA256-Hash", hashHex);
-                    }
-
-                    // Return ZIP file
-                    return File(zipBytes, "application/zip", "VinhKhanh_OfflinePack.zip");
+                    // Add hash to response headers
+                    Response.Headers.Append("X-SHA256-Hash", manifest.SHA256Hash);
+                    return PhysicalFile(packPath, "application/zip", PACK_FILENAME);
+                }
+                catch (IOException ex)
+                {
+                    return StatusCode(500, new { Message = $"Error reading offline pack: {ex.Message}" });
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Message = "Lỗi khi tạo gói offline: " + ex.Message });
+                return StatusCode(500, new { Message = $"Error serving offline pack: {ex.Message}" });
             }
         }
 
-        // Helper: Add media file to ZIP archive
-        private async Task AddMediaFileToZip(ZipArchive zipArchive, string relativePath)
+        // API: Admin endpoint to generate and cache the Offline ZIP Pack
+        [HttpPost("admin/sync/generate-pack")]
+        [Authorize]
+        public async Task<IActionResult> GenerateOfflinePack()
         {
             try
             {
-                // Construct physical file path from relative path
-                if (string.IsNullOrEmpty(relativePath))
-                    return;
-
-                // Remove leading slash if present
-                var cleanPath = relativePath.TrimStart('/');
-                var physicalPath = Path.Combine(_env.WebRootPath, cleanPath);
-
-                // Verify file exists
-                if (!System.IO.File.Exists(physicalPath))
+                // Verify user has Admin role
+                var roleName = User.FindFirst(ClaimTypes.Role)?.Value;
+                if (string.IsNullOrEmpty(roleName) || roleName != "Admin")
                 {
-                    // Log and ignore if file is missing
-                    return;
+                    return Forbid();
                 }
 
-                // Add file to ZIP using relative path as entry name
-                var zipEntryName = cleanPath.Replace("\\", "/");
-                var zipEntry = zipArchive.CreateEntry(zipEntryName);
+                var packPath = Path.Combine(_offlinePacksDirectory, PACK_FILENAME);
+                var hashPath = Path.Combine(_offlinePacksDirectory, HASH_FILENAME);
 
-                using (var fileStream = System.IO.File.OpenRead(physicalPath))
+                try
                 {
-                    using (var zipStream = zipEntry.Open())
+                    await _syncService.GenerateOfflinePackAsync();
+                    var hashHex = (await System.IO.File.ReadAllTextAsync(hashPath)).Trim();
+
+                    // Get file info for response
+                    var fileInfo = new FileInfo(packPath);
+                    return Ok(new
                     {
-                        await fileStream.CopyToAsync(zipStream);
-                    }
+                        Message = "Offline pack generated successfully.",
+                        FileName = PACK_FILENAME,
+                        FileSizeBytes = fileInfo.Length,
+                        SHA256Hash = hashHex,
+                        GeneratedAt = DateTime.UtcNow
+                    });
+                }
+                catch (IOException ex)
+                {
+                    return StatusCode(500, new { Message = $"Error creating ZIP file: {ex.Message}" });
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(500, new { Message = $"Error generating offline pack: {ex.Message}" });
                 }
             }
             catch (Exception ex)
             {
-                // Log error but don't fail the entire ZIP creation
-                // In production, use ILogger for proper logging
-                System.Diagnostics.Debug.WriteLine($"Lỗi khi thêm file media vào ZIP: {relativePath} - {ex.Message}");
+                return StatusCode(500, new { Message = $"Unexpected error: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("public/sync/manifest")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetManifest()
+        {
+            var manifest = await _syncService.GetManifestAsync();
+            if (manifest == null)
+            {
+                return NotFound(new { Message = "Offline pack is not available yet." });
+            }
+
+            return Ok(manifest);
+        }
+
+        [HttpGet("admin/sync/status")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetSyncStatus()
+        {
+            var status = await _syncService.GetStatusAsync();
+            return Ok(status);
+        }
+
+        [HttpPost("sync/logs")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CreateNarrationLog([FromBody] NarrationLogRequestDto request)
+        {
+            if (request.PoiId <= 0 || string.IsNullOrWhiteSpace(request.DeviceId))
+            {
+                return BadRequest(new { Message = "PoiId và DeviceId là bắt buộc." });
+            }
+
+            var poiExists = await _context.Pois.AnyAsync(p => p.Id == request.PoiId && p.Status == PoiStatus.Approved);
+            if (!poiExists)
+            {
+                return NotFound(new { Message = "POI không tồn tại hoặc chưa được duyệt." });
+            }
+
+            var log = new NarrationLog
+            {
+                PoiId = request.PoiId,
+                DeviceId = request.DeviceId,
+                Timestamp = request.Timestamp ?? DateTime.UtcNow
+            };
+            _context.NarrationLogs.Add(log);
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Đã ghi nhận lượt nghe.", Id = log.Id });
+        }
+
+        [HttpGet("owner/stats/listens")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> GetOwnerListenStats()
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var ownerId))
+            {
+                return Unauthorized(new { Message = "Không thể xác định người dùng." });
+            }
+
+            var stats = await _context.Pois
+                .Where(p => p.OwnerId == ownerId)
+                .Select(p => new OwnerListenStatsDto
+                {
+                    PoiId = p.Id,
+                    PoiName = p.Name,
+                    ListenCount = _context.NarrationLogs.Count(n => n.PoiId == p.Id)
+                })
+                .ToListAsync();
+
+            return Ok(stats);
+        }
+
+        // API: Kiểm tra phiên bản dữ liệu (Dùng mã SHA-256 làm Version)
+        // Mobile App gọi API này mỗi khi khởi động
+        [HttpGet("public/version")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetLatestVersion()
+        {
+            try
+            {
+                // Trỏ tới file text chứa mã SHA-256 mà hàm Generate Pack đã tạo ra
+                var hashFilePath = Path.Combine(_env.WebRootPath, "offline-packs", "VinhKhanh_OfflinePack.sha256.txt");
+
+                // Trường hợp Admin chưa từng bấm Generate lần nào
+                if (!System.IO.File.Exists(hashFilePath))
+                {
+                    return Ok(new 
+                    { 
+                        version = "none", 
+                        message = "Chưa có gói dữ liệu offline nào được tạo." 
+                    });
+                }
+
+                // Đọc mã hash từ đĩa (Tốn 0.001s, không dùng đến Database)
+                var currentHash = await System.IO.File.ReadAllTextAsync(hashFilePath);
+
+                // Lấy thêm ngày giờ file được tạo để App có thể hiển thị: "Bản cập nhật ngày..."
+                var lastUpdated = System.IO.File.GetLastWriteTimeUtc(hashFilePath);
+
+                return Ok(new 
+                { 
+                    version = currentHash.Trim(), 
+                    lastUpdated = lastUpdated
+                });
+            }
+            catch (Exception ex)
+            {
+                // In production, use proper logging
+                return StatusCode(500, new { message = "Lỗi khi lấy phiên bản: " + ex.Message });
             }
         }
     }

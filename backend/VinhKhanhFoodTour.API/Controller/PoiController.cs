@@ -1,27 +1,27 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using VinhKhanhFoodTour.Data;
-using VinhKhanhFoodTour.Models;
 using VinhKhanhFoodTour.DTOs;
-using VinhKhanhFoodTour.API;
-using NetTopologySuite.Geometries;
+using VinhKhanhFoodTour.API.Services;
+using VinhKhanhFoodTour.Models;
+
 namespace VinhKhanhFoodTour.API.Controllers
 {
     [Route("api/v1/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin,Owner")] // Chỉ Admin và Chủ quán mới được vào đây
+    [Authorize(Roles = "Admin,Owner")]
     public class PoiController : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly IWebHostEnvironment _env;
+        private readonly IPoiService _poiService;
+        private readonly IMediaService _mediaService;
+        private readonly ISyncOrchestrator _syncOrchestrator;
 
-        public PoiController(AppDbContext context, IWebHostEnvironment env)
+        public PoiController(IPoiService poiService, IMediaService mediaService, ISyncOrchestrator syncOrchestrator)
         {
-            _context = context;
-            _env = env;
+            _poiService = poiService;
+            _mediaService = mediaService;
+            _syncOrchestrator = syncOrchestrator;
         }
 
         // API: Thêm một quán ăn mới
@@ -37,32 +37,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng từ token." });
                 }
 
-                // 1. Convert Latitude/Longitude from DTO to Point using SpatialHelper
-                var location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
-
-                // 2. Tạo thực thể POI (Quán ăn)
-                var newPoi = new Poi
-                {
-                    OwnerId = ownerId,
-                    Name = request.Name,
-                    Location = location,
-                    Status = PoiStatus.Pending, // Mặc định chờ duyệt
-                    TriggerRadius = 50,  // Bán kính kích hoạt 50m
-                    LastUpdated = DateTime.UtcNow,
-                    Translations = new List<PoiTranslation>
-                    {
-                        new PoiTranslation
-                        {
-                            LanguageCode = "vi",
-                            Title = request.Title,
-                            Description = request.Description
-                        }
-                    }
-                };
-                // 3. Lưu vào Database
-                _context.Pois.Add(newPoi);
-
-                await _context.SaveChangesAsync();
+                var newPoi = await _poiService.CreatePoiAsync(ownerId, request);
 
                 return Ok(new
                 {
@@ -83,31 +58,12 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                var pendingPois = await _context.Pois
-                    .Where(p => p.Status == PoiStatus.Pending)
-                    .Select(p => new PoiDto
-                    {
-                        Id = p.Id,
-                        Name = p.Name,
-                        Latitude = SpatialHelper.GetLatitude(p.Location),
-                        Longitude = SpatialHelper.GetLongitude(p.Location),
-                        Status = p.Status,
-                        RejectionReason = p.RejectionReason,
-                        Translations = p.Translations.Select(t => new PoiTranslationDto
-                        {
-                            Id = t.Id,
-                            LanguageCode = t.LanguageCode, // Sửa lại tên biến cho khớp với Entity của bạn
-                            Title = t.Title,
-                            Description = t.Description
-                        }).ToList()
-                    })
-                    .ToListAsync();
+                var pendingPois = await _poiService.GetPendingPoisAsync();
 
                 return Ok(pendingPois);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // Trong thực tế nên dùng ILogger để log lỗi ex.Message lại
                 return StatusCode(500, "Đã xảy ra lỗi khi lấy danh sách quán ăn chờ duyệt.");
             }
         }
@@ -119,23 +75,13 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                var poi = await _context.Pois.FindAsync(id);
-
-                if (poi == null)
-                {
-                    return NotFound(new { Message = $"Không tìm thấy quán với ID: {id}" });
-                }
-
-                poi.Status = PoiStatus.Approved;
-                poi.LastUpdated = DateTime.UtcNow;
-                _context.Pois.Update(poi);
-                await _context.SaveChangesAsync();
+                var poi = await _poiService.ApprovePoiAsync(id);
 
                 return Ok(new { Message = "Đã duyệt quán ăn thành công!", Id = poi.Id });
             }
-            catch (DbUpdateException ex)
+            catch (KeyNotFoundException ex)
             {
-                return StatusCode(500, new { Message = "Lỗi cơ sở dữ liệu: " + ex.Message });
+                return NotFound(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -150,24 +96,13 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                var poi = await _context.Pois.FindAsync(id);
-
-                if (poi == null)
-                {
-                    return NotFound(new { Message = $"Không tìm thấy quán với ID: {id}" });
-                }
-
-                poi.Status = PoiStatus.Rejected;
-                poi.RejectionReason = request.Reason;
-                poi.LastUpdated = DateTime.UtcNow;
-                _context.Pois.Update(poi);
-                await _context.SaveChangesAsync();
+                var poi = await _poiService.RejectPoiAsync(id, request.Reason);
 
                 return Ok(new { Message = "Đã từ chối quán ăn thành công!", Id = poi.Id });
             }
-            catch (DbUpdateException ex)
+            catch (KeyNotFoundException ex)
             {
-                return StatusCode(500, new { Message = "Lỗi cơ sở dữ liệu: " + ex.Message });
+                return NotFound(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -189,34 +124,9 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng." });
                 }
 
-                var location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
-
-                var newPoi = new Poi
-                {
-                    OwnerId = ownerId,
-                    Name = request.Name,
-                    Location = location,
-                    Status = PoiStatus.Pending,
-                    TriggerRadius = 50,
-                    Translations = new List<PoiTranslation>
-                    {
-                        new PoiTranslation
-                        {
-                            LanguageCode = "vi",
-                            Title = request.Title,
-                            Description = request.Description
-                        }
-                    }
-                };
-
-                _context.Pois.Add(newPoi);
-                await _context.SaveChangesAsync();
+                var newPoi = await _poiService.CreateOwnerPoiAsync(ownerId, request);
 
                 return CreatedAtAction(nameof(CreatePoi), new { id = newPoi.Id }, new { Message = "Đã tạo quán ăn thành công! Chờ Admin duyệt.", Id = newPoi.Id });
-            }
-            catch (DbUpdateException ex)
-            {
-                return StatusCode(500, new { Message = "Lỗi cơ sở dữ liệu: " + ex.Message });
             }
             catch (Exception ex)
             {
@@ -238,31 +148,17 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng." });
                 }
 
-                var poi = await _context.Pois.FindAsync(id);
-                if (poi == null)
-                {
-                    return NotFound(new { Message = $"Không tìm thấy quán với ID: {id}" });
-                }
-
-                if (poi.OwnerId != currentUserId)
-                {
-                    return Forbid();
-                }
-
-                poi.Name = request.Name;
-                poi.Location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
-                poi.Status = PoiStatus.Pending;
-                poi.RejectionReason = null;
-                poi.LastUpdated = DateTime.UtcNow;
-
-                _context.Pois.Update(poi);
-                await _context.SaveChangesAsync();
+                var poi = await _poiService.UpdatePoiAsync(id, currentUserId, request);
 
                 return Ok(new { Message = "Đã cập nhật quán ăn thành công! Chờ Admin duyệt lại.", Id = poi.Id });
             }
-            catch (DbUpdateException ex)
+            catch (UnauthorizedAccessException)
             {
-                return StatusCode(500, new { Message = "Lỗi cơ sở dữ liệu: " + ex.Message });
+                return Forbid();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -284,25 +180,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng." });
                 }
 
-                var myPois = await _context.Pois
-                    .Where(p => p.OwnerId == ownerIdForList)
-                    .Select(p => new PoiDto
-                    {
-                        Id = p.Id,
-                        Name = p.Name,
-                        Latitude = SpatialHelper.GetLatitude(p.Location),
-                        Longitude = SpatialHelper.GetLongitude(p.Location),
-                        Status = p.Status,
-                        RejectionReason = p.RejectionReason,
-                        Translations = p.Translations.Select(t => new PoiTranslationDto
-                        {
-                            Id = t.Id,
-                            LanguageCode = t.LanguageCode,
-                            Title = t.Title,
-                            Description = t.Description
-                        }).ToList()
-                    })
-                    .ToListAsync();
+                var myPois = await _poiService.GetOwnerPoisAsync(ownerIdForList);
 
                 return Ok(myPois);
             }
@@ -319,25 +197,7 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                var approvedPois = await _context.Pois
-                    .Where(p => p.Status == PoiStatus.Approved)
-                    .Select(p => new PoiDto
-                    {
-                        Id = p.Id,
-                        Name = p.Name,
-                        Latitude = SpatialHelper.GetLatitude(p.Location),
-                        Longitude = SpatialHelper.GetLongitude(p.Location),
-                        Status = p.Status,
-                        RejectionReason = p.RejectionReason,
-                        Translations = p.Translations.Select(t => new PoiTranslationDto
-                        {
-                            Id = t.Id,
-                            LanguageCode = t.LanguageCode,
-                            Title = t.Title,
-                            Description = t.Description
-                        }).ToList()
-                    })
-                    .ToListAsync();
+                var approvedPois = await _poiService.GetPublicPoisAsync();
 
                 return Ok(approvedPois);
             }
@@ -354,16 +214,7 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                var mapPins = await _context.Pois
-                    .Where(p => p.Status == PoiStatus.Approved)
-                    .Select(p => new MapPinDto
-                    {
-                        Id = p.Id,
-                        Name = p.Name,
-                        Latitude = SpatialHelper.GetLatitude(p.Location),
-                        Longitude = SpatialHelper.GetLongitude(p.Location)
-                    })
-                    .ToListAsync();
+                var mapPins = await _poiService.GetMapPinsAsync();
 
                 return Ok(mapPins);
             }
@@ -381,30 +232,7 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                // Create a Point from user's coordinates with SRID 4326 (WGS84)
-                var userLocation = SpatialHelper.CreatePoint(userLat, userLng);
-
-                // Query using spatial distance at database level
-                // SQL Server's STDistance() method returns distance in meters (for geography type)
-                var nearbyPois = await _context.Pois
-                    .Where(p => p.Status == PoiStatus.Approved && p.Location.Distance(userLocation) <= radiusInMeters)
-                    .Select(p => new PoiDto
-                    {
-                        Id = p.Id,
-                        Name = p.Name,
-                        Latitude = SpatialHelper.GetLatitude(p.Location),
-                        Longitude = SpatialHelper.GetLongitude(p.Location),
-                        Status = p.Status,
-                        RejectionReason = p.RejectionReason,
-                        Translations = p.Translations.Select(t => new PoiTranslationDto
-                        {
-                            Id = t.Id,
-                            LanguageCode = t.LanguageCode,
-                            Title = t.Title,
-                            Description = t.Description
-                        }).ToList()
-                    })
-                    .ToListAsync();
+                var nearbyPois = await _poiService.GetNearbyPoisAsync(userLat, userLng, radiusInMeters);
 
                 return Ok(nearbyPois);
             }
@@ -429,105 +257,27 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng từ token." });
                 }
 
-                // 2. Find the POI by id asynchronously
-                var poi = await _context.Pois.FindAsync(id);
-                if (poi == null)
-                {
-                    return NotFound(new { Message = $"Không tìm thấy quán với ID: {id}" });
-                }
-
-                // 3. Verify ownership
-                if (poi.OwnerId != currentUserId)
-                {
-                    return Forbid();
-                }
-
-                // 4. Find the PoiTranslation associated with this POI and the given languageCode
-                var translation = await _context.PoiTranslations
-                    .FirstOrDefaultAsync(t => t.PoiId == id && t.LanguageCode == languageCode);
-
-                if (translation == null)
-                {
-                    return NotFound(new { Message = $"Không tìm thấy bản dịch cho ngôn ngữ: {languageCode}" });
-                }
-
-                // 5. Handle image file upload if provided
-                if (imageFile != null && imageFile.Length > 0)
-                {
-                    // Validate extension
-                    var allowedImageExtensions = new[] { ".jpg", ".jpeg", ".png" };
-                    var imageExtension = Path.GetExtension(imageFile.FileName).ToLower();
-
-                    if (!allowedImageExtensions.Contains(imageExtension))
-                    {
-                        return BadRequest(new { Message = "Định dạng ảnh không hợp lệ. Chỉ cho phép: .jpg, .jpeg, .png" });
-                    }
-
-                    // Generate unique filename using GUID
-                    var uniqueImageFileName = $"{Guid.NewGuid()}{imageExtension}";
-                    var imageDirectory = Path.Combine(_env.WebRootPath, "uploads", "images");
-
-                    // Ensure the directory exists
-                    if (!Directory.Exists(imageDirectory))
-                    {
-                        Directory.CreateDirectory(imageDirectory);
-                    }
-
-                    var imageFilePath = Path.Combine(imageDirectory, uniqueImageFileName);
-
-                    // Save file asynchronously with using statement
-                    using (var fileStream = new FileStream(imageFilePath, FileMode.Create))
-                    {
-                        await imageFile.CopyToAsync(fileStream);
-                    }
-
-                    // Update the translation's ImageUrl
-                    translation.ImageUrl = $"/uploads/images/{uniqueImageFileName}";
-                }
-
-                // 6. Handle audio file upload if provided
-                if (audioFile != null && audioFile.Length > 0)
-                {
-                    // Validate extension
-                    var allowedAudioExtensions = new[] { ".mp3", ".wav" };
-                    var audioExtension = Path.GetExtension(audioFile.FileName).ToLower();
-
-                    if (!allowedAudioExtensions.Contains(audioExtension))
-                    {
-                        return BadRequest(new { Message = "Định dạng âm thanh không hợp lệ. Chỉ cho phép: .mp3, .wav" });
-                    }
-
-                    // Generate unique filename using GUID
-                    var uniqueAudioFileName = $"{Guid.NewGuid()}{audioExtension}";
-                    var audioDirectory = Path.Combine(_env.WebRootPath, "uploads", "audio");
-
-                    // Ensure the directory exists
-                    if (!Directory.Exists(audioDirectory))
-                    {
-                        Directory.CreateDirectory(audioDirectory);
-                    }
-
-                    var audioFilePath = Path.Combine(audioDirectory, uniqueAudioFileName);
-
-                    // Save file asynchronously with using statement
-                    using (var fileStream = new FileStream(audioFilePath, FileMode.Create))
-                    {
-                        await audioFile.CopyToAsync(fileStream);
-                    }
-
-                    // Update the translation's AudioFilePath
-                    translation.AudioFilePath = $"/uploads/audio/{uniqueAudioFileName}";
-                }
-
-                // Check if at least one file was uploaded
                 if (imageFile == null && audioFile == null)
                 {
                     return BadRequest(new { Message = "Vui lòng cung cấp ít nhất một tệp ảnh hoặc âm thanh." });
                 }
 
-                // 7. Save changes to database
-                _context.PoiTranslations.Update(translation);
-                await _context.SaveChangesAsync();
+                var (poi, translation) = await _poiService.GetOwnerTranslationAsync(id, languageCode, currentUserId);
+                var saved = await _mediaService.SaveMediaAsync(imageFile, audioFile);
+                if (saved.imageUrl != null)
+                {
+                    translation.ImageUrl = saved.imageUrl;
+                }
+                if (saved.audioFilePath != null)
+                {
+                    translation.AudioFilePath = saved.audioFilePath;
+                }
+
+                await _poiService.SaveTranslationAsync(translation);
+                if (poi.Status == PoiStatus.Approved)
+                {
+                    await _syncOrchestrator.TryRefreshOfflinePackAsync();
+                }
 
                 // Return Ok with updated ImageUrl and AudioFilePath
                 return Ok(new
@@ -541,56 +291,22 @@ namespace VinhKhanhFoodTour.API.Controllers
             {
                 return StatusCode(500, new { Message = "Lỗi tệp hệ thống: " + ioEx.Message });
             }
-            catch (DbUpdateException dbEx)
+            catch (InvalidOperationException ex)
             {
-                return StatusCode(500, new { Message = "Lỗi cơ sở dữ liệu: " + dbEx.Message });
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { Message = "Lỗi khi tải lên tệp media: " + ex.Message });
             }
         }
-    }
-
-    // Class hứng dữ liệu từ phía Client gửi lên (DTO)
-    public class CreatePoiRequest
-    {
-        public string Name { get; set; } = null!;
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public string Title { get; set; } = null!;
-        public string Description { get; set; } = null!;
-    }
-
-    // DTO để nhận lý do từ chối quán ăn
-    public class RejectPoiDto
-    {
-        public string Reason { get; set; } = null!;
-    }
-
-    // DTO để chủ quán tạo quán ăn mới
-    public class CreatePoiDto
-    {
-        public string Name { get; set; } = null!;
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public string Title { get; set; } = null!;
-        public string Description { get; set; } = null!;
-    }
-
-    // DTO để chủ quán cập nhật quán ăn của mình
-    public class UpdatePoiDto
-    {
-        public string Name { get; set; } = null!;
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-    }
-    // DTO nhẹ cho bản đồ (chỉ chứa Id, Name, Latitude, Longitude)
-    public class MapPinDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = null!;
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
     }
 }
