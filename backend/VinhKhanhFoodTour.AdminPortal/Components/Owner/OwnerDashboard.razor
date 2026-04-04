@@ -1,0 +1,250 @@
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+
+<Notifications @ref="NotificationComponent" />
+
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">My Restaurants</h1>
+            <p class="text-gray-600 mt-1">Manage your POI locations and view statistics</p>
+        </div>
+        <button @onclick="ShowAddPoiForm" class="btn btn-primary">
+            📍 Add New Restaurant
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card">
+            <div class="text-sm text-gray-600 uppercase tracking-wide">Total Restaurants</div>
+            <div class="text-3xl font-bold text-blue-600 mt-2">@Pois.Count</div>
+            <p class="text-xs text-gray-500 mt-2">@(Pois.Count == 0 ? "No restaurants yet" : "Managed by you")</p>
+        </div>
+        <div class="card">
+            <div class="text-sm text-gray-600 uppercase tracking-wide">Approved</div>
+            <div class="text-3xl font-bold text-green-600 mt-2">@Pois.Count(p => p.Status == "Approved")</div>
+            <p class="text-xs text-gray-500 mt-2">Ready to access</p>
+        </div>
+        <div class="card">
+            <div class="text-sm text-gray-600 uppercase tracking-wide">Pending</div>
+            <div class="text-3xl font-bold text-yellow-600 mt-2">@Pois.Count(p => p.Status == "Pending")</div>
+            <p class="text-xs text-gray-500 mt-2">Awaiting approval</p>
+        </div>
+    </div>
+
+    <!-- Restaurants Table -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-xl font-bold text-gray-800">Restaurant Listings</h2>
+        </div>
+        
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Coordinates</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (IsLoading)
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-8 text-gray-500">
+                                Loading restaurants... 
+                                <span class="spinner ml-2">⏳</span>
+                            </td>
+                        </tr>
+                    }
+                    else if (Pois.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-8 text-gray-500">
+                                No restaurants yet. Click "Add New Restaurant" to get started!
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var poi in Pois)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="font-medium text-gray-900">@poi.Name</div>
+                                </td>
+                                <td>
+                                    <div class="text-sm text-gray-600">
+                                        @poi.Latitude.ToString("F4"), @poi.Longitude.ToString("F4")
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="@GetStatusBadgeClass(poi.Status)">
+                                        @poi.Status
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="text-sm text-gray-600">
+                                        @poi.CreatedAt.ToString("MMM dd, yyyy")
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="flex gap-2">
+                                        <button class="text-blue-600 hover:text-blue-800 text-sm font-medium" 
+                                                @onclick="() => ViewPoiDetails(poi)">
+                                            View
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Listen Statistics Section -->
+    @if (ListenStats.Count > 0)
+    {
+        <div class="card">
+            <div class="card-header">
+                <h2 class="text-xl font-bold text-gray-800">Narration Listen Statistics</h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    @foreach (var stat in ListenStats)
+                    {
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                            <div class="font-semibold text-gray-800">@stat.PoiName</div>
+                            <div class="text-3xl font-bold text-blue-600 mt-2">@stat.ListenCount</div>
+                            <div class="text-xs text-gray-600 mt-1">narration listens</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else if (!IsLoadingStats)
+    {
+        <div class="card">
+            <div class="card-header">
+                <h2 class="text-xl font-bold text-gray-800">Narration Listen Statistics</h2>
+            </div>
+            <div class="p-8 text-center text-gray-500">
+                <p>No statistics available yet. Create a restaurant and wait for approvals!</p>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Add POI Modal -->
+<AddPoiModal IsOpen="@IsModalOpen"
+             OnClose="HandleModalClose"
+             OnSuccess="HandlePoiCreated"
+             ParentNotifications="@NotificationComponent" />
+
+@code {
+    [Inject]
+    private IPoiService? PoiService { get; set; }
+
+    private Notifications? NotificationComponent { get; set; }
+
+    private List<VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiDto> Pois = new();
+    private List<VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiListenStatsDto> ListenStats = new();
+    private bool IsModalOpen = false;
+    private bool IsLoading = true;
+    private bool IsLoadingStats = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (PoiService == null)
+        {
+            NotificationComponent?.ShowNotification(
+                "Error",
+                "POI Service not available",
+                Notifications.NotificationType.Error
+            );
+            return;
+        }
+
+        try
+        {
+            await LoadPoisAsync();
+            await LoadStatisticsAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationComponent?.ShowNotification(
+                "Error",
+                $"Failed to load data: {ex.Message}",
+                Notifications.NotificationType.Error
+            );
+        }
+    }
+
+    private async Task LoadPoisAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            Pois = await PoiService!.GetOwnerPoisAsync();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        try
+        {
+            IsLoadingStats = true;
+            ListenStats = await PoiService!.GetListenStatsAsync();
+        }
+        finally
+        {
+            IsLoadingStats = false;
+        }
+    }
+
+    private void ShowAddPoiForm()
+    {
+        IsModalOpen = true;
+    }
+
+    private async Task HandleModalClose()
+    {
+        IsModalOpen = false;
+    }
+
+    private async Task HandlePoiCreated()
+    {
+        IsModalOpen = false;
+        await LoadPoisAsync();
+        await LoadStatisticsAsync();
+        StateHasChanged();
+    }
+
+    private void ViewPoiDetails(VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiDto poi)
+    {
+        NotificationComponent?.ShowNotification(
+            "Info",
+            $"View details for {poi.Name} - Feature coming soon!",
+            Notifications.NotificationType.Info
+        );
+    }
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Approved" => "badge badge-success",
+        "Pending" => "badge badge-warning",
+        "Rejected" => "badge badge-error",
+        _ => "badge badge-info"
+    };
+}

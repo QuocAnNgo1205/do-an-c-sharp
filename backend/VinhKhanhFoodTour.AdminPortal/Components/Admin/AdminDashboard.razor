@@ -1,0 +1,336 @@
+@page "/admin/dashboard"
+@using VinhKhanhFoodTour.AdminPortal.Services.Admin
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@attribute [Authorize(Roles = "Admin")]
+
+<Notifications @ref="NotificationComponent" />
+<RejectPoiModal @ref="RejectModal" OnPoiRejected="@OnPoiRejected" />
+
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+            <p class="text-gray-600 mt-1">System status and POI approval queue</p>
+        </div>
+        <button @onclick="RefreshData" class="btn btn-secondary" disabled="@(IsLoadingPois || IsLoadingSync)">
+            🔄 Refresh
+        </button>
+    </div>
+
+    <!-- Section 1: System Status Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-lg font-bold text-gray-800">📡 System Status - Offline Pack Sync</h2>
+        </div>
+        
+        @if (IsLoadingSync)
+        {
+            <div class="text-center py-8 text-gray-500">
+                <div class="spinner-dot mx-auto mb-3"></div>
+                Loading system status...
+            </div>
+        }
+        else if (SyncStatus == null)
+        {
+            <div class="text-center py-8 text-red-500">
+                ❌ Unable to load system status
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Status Indicator -->
+                <div class="flex items-center gap-4">
+                    <div class="@GetStatusIndicatorClass()"></div>
+                    <div>
+                        <div class="text-sm text-gray-600">System Status</div>
+                        <div class="text-lg font-semibold text-gray-800">
+                            @if (SyncStatus.IsRunning)
+                            {
+                                <span class="text-yellow-600">⚙️ Running</span>
+                            }
+                            else if (SyncStatus.LastError != null)
+                            {
+                                <span class="text-red-600">❌ Error</span>
+                            }
+                            else if (SyncStatus.HasSuccess)
+                            {
+                                <span class="text-green-600">✅ Healthy</span>
+                            }
+                            else
+                            {
+                                <span class="text-gray-600">⚠️ No Pack Generated</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last Sync Time -->
+                <div>
+                    <div class="text-sm text-gray-600">Last Successful Sync</div>
+                    <div class="text-lg font-semibold text-gray-800">
+                        @if (SyncStatus.LastSuccessAt.HasValue)
+                        {
+                            <div>@SyncStatus.LastSuccessAt.Value.ToString("MMM dd, yyyy HH:mm:ss")</div>
+                            <div class="text-xs text-gray-500">
+                                (@((DateTime.UtcNow - SyncStatus.LastSuccessAt.Value).TotalMinutes.ToString("F0")) minutes ago)
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="text-gray-500">Never</span>
+                        }
+                    </div>
+                </div>
+
+                <!-- Processing Time -->
+                @if (SyncStatus.LastDurationMs.HasValue)
+                {
+                    <div>
+                        <div class="text-sm text-gray-600">Processing Time</div>
+                        <div class="text-lg font-semibold text-gray-800">
+                            @SyncStatus.LastDurationMs.Value ms
+                        </div>
+                    </div>
+                }
+
+                <!-- Error Message (if any) -->
+                @if (!string.IsNullOrEmpty(SyncStatus.LastError))
+                {
+                    <div class="md:col-span-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div class="text-sm font-semibold text-red-800">⚠️ Last Error</div>
+                        <div class="text-sm text-red-700 mt-1">@SyncStatus.LastError</div>
+                        @if (SyncStatus.LastErrorAt.HasValue)
+                        {
+                            <div class="text-xs text-red-600 mt-1">
+                                @SyncStatus.LastErrorAt.Value.ToString("MMM dd, yyyy HH:mm:ss")
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Section 2: Pending POIs Approval Queue -->
+    <div class="card">
+        <div class="card-header">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-bold text-gray-800">
+                    📋 Pending POIs Approval Queue
+                </h2>
+                <span class="badge badge-warning">
+                    @PendingPois.Count Pending
+                </span>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Coordinates</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (IsLoadingPois)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center py-8 text-gray-500">
+                                <div class="spinner-dot mx-auto mb-3"></div>
+                                Loading pending POIs...
+                            </td>
+                        </tr>
+                    }
+                    else if (PendingPois.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center py-8 text-gray-500">
+                                ✅ No pending POIs! All submissions have been reviewed.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var poi in PendingPois)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="text-xs font-mono text-gray-500">#@poi.Id</span>
+                                </td>
+                                <td>
+                                    <div class="font-medium text-gray-900">@poi.Name</div>
+                                </td>
+                                <td>
+                                    <div class="text-sm text-gray-600">
+                                        @poi.Latitude.ToString("F4"), @poi.Longitude.ToString("F4")
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="flex gap-2">
+                                        <button 
+                                            class="btn btn-approve text-sm" 
+                                            @onclick="() => ApprovePoiAsync(poi.Id)"
+                                            disabled="@(ProcessingPoiId == poi.Id)">
+                                            @if (ProcessingPoiId == poi.Id && IsApproving)
+                                            {
+                                                <span>⏳ Đang duyệt...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>✅ Duyệt</span>
+                                            }
+                                        </button>
+                                        <button 
+                                            class="btn btn-reject text-sm" 
+                                            @onclick="() => ShowRejectModal(poi)"
+                                            disabled="@(ProcessingPoiId == poi.Id)">
+                                            ❌ Từ chối
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    private IAdminService? AdminService { get; set; }
+
+    [Inject]
+    private ISyncService? SyncService { get; set; }
+
+    [Inject]
+    private ILogger<AdminDashboard>? Logger { get; set; }
+
+    private Notifications? NotificationComponent { get; set; }
+    private RejectPoiModal? RejectModal { get; set; }
+
+    private List<AdminPoiDto> PendingPois = new();
+    private SyncStatusDto? SyncStatus;
+    private bool IsLoadingPois = true;
+    private bool IsLoadingSync = true;
+    private int? ProcessingPoiId = null;
+    private bool IsApproving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        IsLoadingPois = true;
+        IsLoadingSync = true;
+
+        try
+        {
+            // Load both in parallel
+            var poiTask = AdminService!.GetAllPendingPoisAsync();
+            var syncTask = SyncService!.GetSyncStatusAsync();
+
+            await Task.WhenAll(poiTask, syncTask);
+
+            PendingPois = await poiTask;
+            SyncStatus = await syncTask;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError($"Error loading admin dashboard data: {ex.Message}");
+            NotificationComponent?.ShowNotification(
+                "Lỗi",
+                "Không thể tải dữ liệu dashboard. Vui lòng thử lại.",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            IsLoadingPois = false;
+            IsLoadingSync = false;
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadDataAsync();
+        NotificationComponent?.ShowNotification(
+            "Đã cập nhật",
+            "Dữ liệu dashboard đã được tải lại.",
+            Notifications.NotificationType.Info,
+            3000
+        );
+    }
+
+    private async Task ApprovePoiAsync(int poiId)
+    {
+        ProcessingPoiId = poiId;
+        IsApproving = true;
+        
+        try
+        {
+            // If the call succeeds (no exception), the POI was approved
+            var result = await AdminService!.ApprovePoisAsync(poiId);
+            
+            // Remove from pending list
+            PendingPois.RemoveAll(p => p.Id == poiId);
+            
+            NotificationComponent?.ShowNotification(
+                "Đã duyệt ✅",
+                result.Message ?? "Quán ăn đã được duyệt thành công!",
+                Notifications.NotificationType.Success
+            );
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError($"Error approving POI: {ex.Message}");
+            NotificationComponent?.ShowNotification(
+                "Lỗi",
+                "Không thể duyệt quán ăn. Vui lòng thử lại.",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            ProcessingPoiId = null;
+            IsApproving = false;
+        }
+    }
+
+    private void ShowRejectModal(AdminPoiDto poi)
+    {
+        RejectModal?.ShowModal(poi);
+    }
+
+    private async Task OnPoiRejected(AdminPoiDto poi)
+    {
+        // Remove from pending list
+        PendingPois.RemoveAll(p => p.Id == poi.Id);
+        
+        NotificationComponent?.ShowNotification(
+            "Đã từ chối ❌",
+            $"Quán '{poi.Name}' đã bị từ chối.",
+            Notifications.NotificationType.Success
+        );
+    }
+
+    private string GetStatusIndicatorClass()
+    {
+        if (SyncStatus?.IsRunning == true)
+            return "w-4 h-4 bg-yellow-500 rounded-full animate-pulse";
+        if (!string.IsNullOrEmpty(SyncStatus?.LastError))
+            return "w-4 h-4 bg-red-500 rounded-full";
+        if (SyncStatus?.HasSuccess == true)
+            return "w-4 h-4 bg-green-500 rounded-full";
+        
+        return "w-4 h-4 bg-gray-400 rounded-full";
+    }
+}

@@ -1,0 +1,327 @@
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+
+<div class="@(IsOpen ? "modal-open" : "")" @onclick="HandleBackdropClick">
+    <div class="modal-content" @onclick:stopPropagation="true">
+        <!-- Header -->
+        <div class="modal-header">
+            <h2 class="text-2xl font-bold text-gray-800">
+                @(!HasCreatedPoi ? "Add New Restaurant" : "Upload Media")
+            </h2>
+            <button @onclick="Close" class="text-2xl text-gray-500 hover:text-gray-700">×</button>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body">
+            @if (!HasCreatedPoi)
+            {
+                <!-- POI Creation Form -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Restaurant Name *
+                        </label>
+                        <input type="text" 
+                               @bind="FormData.Name" 
+                               class="input-field"
+                               placeholder="Enter restaurant name" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Latitude *
+                            </label>
+                            <input type="number" 
+                                   @bind="FormData.Latitude"
+                                   step="0.000001"
+                                   class="input-field"
+                                   placeholder="E.g., 16.0544" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Longitude *
+                            </label>
+                            <input type="number" 
+                                   @bind="FormData.Longitude"
+                                   step="0.000001"
+                                   class="input-field"
+                                   placeholder="E.g., 107.5793" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Title (Vietnamese) *
+                        </label>
+                        <input type="text" 
+                               @bind="FormData.Title" 
+                               class="input-field"
+                               placeholder="E.g., Quán bún chả ngon nhất" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Description *
+                        </label>
+                        <textarea @bind="FormData.Description" 
+                                  class="input-field"
+                                  rows="4"
+                                  placeholder="Describe your restaurant..."></textarea>
+                    </div>
+
+                    <p class="text-sm text-gray-500 italic">
+                        Fields marked with * are required
+                    </p>
+                </div>
+            }
+            else
+            {
+                <!-- Media Upload Form -->
+                <div class="space-y-6 max-w-md mx-auto">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <p class="text-green-800">
+                            ✅ Restaurant created successfully! ID: <strong>@NewPoiId</strong>
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Language Code (e.g., "vi" or "en")
+                        </label>
+                        <input type="text" 
+                               @bind="MediaLanguageCode" 
+                               class="input-field"
+                               placeholder="vi" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Audio File (MP3)
+                        </label>
+                        <InputFile OnChange="@HandleAudioFileSelected"
+                                   accept=".mp3,audio/mpeg"
+                                   class="input-field" />
+                        @if (AudioFileName != null)
+                        {
+                            <div class="mt-2 text-sm text-green-600">✅ Selected: @AudioFileName</div>
+                        }
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Image File (JPG/PNG)
+                        </label>
+                        <InputFile OnChange="@HandleImageFileSelected"
+                                   accept=".jpg,.jpeg,.png"
+                                   class="input-field" />
+                        @if (ImageFileName != null)
+                        {
+                            <div class="mt-2 text-sm text-green-600">✅ Selected: @ImageFileName</div>
+                        }
+                    </div>
+
+                    <p class="text-sm text-gray-500 italic">
+                        Upload at least one media file (audio or image)
+                    </p>
+                </div>
+            }
+        </div>
+
+        <!-- Footer -->
+        <div class="modal-footer">
+            @if (!HasCreatedPoi)
+            {
+                <button @onclick="Close" class="btn btn-secondary">Cancel</button>
+                <button @onclick="HandleCreatePoi" 
+                        disabled="@(IsLoading || !IsFormValid())"
+                        class="btn btn-primary">
+                    @if (IsLoading)
+                    {
+                        <span>Creating...</span>
+                    }
+                    else
+                    {
+                        <span>Create Restaurant</span>
+                    }
+                </button>
+            }
+            else
+            {
+                <button @onclick="Close" class="btn btn-secondary">Cancel</button>
+                <button @onclick="HandleUploadMedia" 
+                        disabled="@(IsLoading || !IsMediaValid())"
+                        class="btn btn-primary">
+                    @if (IsLoading)
+                    {
+                        <span>Uploading...</span>
+                    }
+                    else
+                    {
+                        <span>Upload Media</span>
+                    }
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnSuccess { get; set; }
+
+    [Inject]
+    private IPoiService? PoiService { get; set; }
+
+    [Parameter]
+    public Notifications? ParentNotifications { get; set; }
+
+    private CreatePoiDto FormData = new();
+    private bool IsLoading = false;
+    private bool HasCreatedPoi = false;
+    private int NewPoiId = 0;
+    private string MediaLanguageCode = "vi";
+    private IBrowserFile? AudioFile;
+    private IBrowserFile? ImageFile;
+    private string? AudioFileName;
+    private string? ImageFileName;
+
+    private bool IsFormValid()
+    {
+        return !string.IsNullOrWhiteSpace(FormData.Name) &&
+               !string.IsNullOrWhiteSpace(FormData.Title) &&
+               !string.IsNullOrWhiteSpace(FormData.Description) &&
+               FormData.Latitude != 0 &&
+               FormData.Longitude != 0;
+    }
+
+    private bool IsMediaValid()
+    {
+        return !string.IsNullOrWhiteSpace(MediaLanguageCode) && 
+               (AudioFile != null || ImageFile != null);
+    }
+
+
+    private async Task HandleCreatePoi()
+    {
+        if (!IsFormValid() || PoiService == null)
+            return;
+
+        try
+        {
+            IsLoading = true;
+            var response = await PoiService.CreatePoiAsync(FormData);
+            
+            NewPoiId = response.Id;
+            HasCreatedPoi = true;
+
+            ParentNotifications?.ShowNotification(
+                "Success",
+                "Restaurant created! Now upload media files.",
+                Notifications.NotificationType.Success
+            );
+        }
+        catch (Exception ex)
+        {
+            ParentNotifications?.ShowNotification(
+                "Error",
+                $"Failed to create restaurant: {ex.Message}",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task HandleUploadMedia()
+    {
+        if (!IsMediaValid() || PoiService == null)
+            return;
+
+        try
+        {
+            IsLoading = true;
+            var content = new MultipartFormDataContent();
+
+            if (AudioFile != null)
+            {
+                var audioStream = AudioFile.OpenReadStream();
+                content.Add(new StreamContent(audioStream), "audioFile", AudioFile.Name);
+            }
+
+            if (ImageFile != null)
+            {
+                var imageStream = ImageFile.OpenReadStream();
+                content.Add(new StreamContent(imageStream), "imageFile", ImageFile.Name);
+            }
+
+            await PoiService.UploadMediaAsync(NewPoiId, MediaLanguageCode, content);
+
+            ParentNotifications?.ShowNotification(
+                "Success",
+                "Media uploaded successfully!",
+                Notifications.NotificationType.Success
+            );
+
+            await Reset();
+            await OnSuccess.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            ParentNotifications?.ShowNotification(
+                "Error",
+                $"Failed to upload media: {ex.Message}",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void HandleAudioFileSelected(InputFileChangeEventArgs e)
+    {
+        AudioFile = e.File;
+        AudioFileName = e.File.Name;
+    }
+
+    private void HandleImageFileSelected(InputFileChangeEventArgs e)
+    {
+        ImageFile = e.File;
+        ImageFileName = e.File.Name;
+    }
+
+    private void HandleBackdropClick()
+    {
+        if (IsOpen)
+            Close();
+    }
+
+    public async Task Close()
+    {
+        await Reset();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task Reset()
+    {
+        FormData = new();
+        HasCreatedPoi = false;
+        NewPoiId = 0;
+        MediaLanguageCode = "vi";
+        AudioFile = null;
+        ImageFile = null;
+        AudioFileName = null;
+        ImageFileName = null;
+        IsLoading = false;
+    }
+}

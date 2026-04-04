@@ -145,11 +145,25 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<AppDbContext>();
 
-    // Ensure database is created
-    context.Database.EnsureCreated();
+    try
+    {
+        // Dùng Migrate() thay vì EnsureCreated() khi có xài thư mục Migrations
+        context.Database.Migrate();
 
-    // Call the initializer
-    DbInitializer.Initialize(context);
+        // Gọi hàm khởi tạo
+        DbInitializer.Initialize(context);
+        
+        Console.WriteLine("Cấy dữ liệu Database thành công!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[LỖI CẤY DỮ LIỆU]: {ex.Message}");
+        // Nếu có lỗi Exception ở sâu bên trong (InnerException), in ra luôn
+        if (ex.InnerException != null)
+        {
+            Console.WriteLine($"[CHI TIẾT LỖI]: {ex.InnerException.Message}");
+        }
+    }
 }
 
 app.UseAuthentication();

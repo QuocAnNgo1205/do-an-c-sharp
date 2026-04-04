@@ -1,0 +1,158 @@
+@using VinhKhanhFoodTour.AdminPortal.Services.Admin
+
+<div id="rejectModal" class="@GetModalClass()" role="dialog">
+    <div class="fixed inset-0 bg-black bg-opacity-50 z-40" @onclick="() => CloseModal()"></div>
+    
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-bold text-gray-800">Từ chối quán ăn</h3>
+                <button @onclick="CloseModal" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    ×
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="px-6 py-4 space-y-4">
+                <!-- POI Name Display -->
+                @if (CurrentPoi != null)
+                {
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div class="text-sm text-red-600">Quán ăn sẽ bị từ chối:</div>
+                        <div class="font-semibold text-red-900">@CurrentPoi.Name</div>
+                        <div class="text-xs text-red-700 mt-1">
+                            Tọa độ: @CurrentPoi.Latitude.ToString("F4"), @CurrentPoi.Longitude.ToString("F4")
+                        </div>
+                    </div>
+                }
+
+                <!-- Reason Textarea -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Lý do từ chối <span class="text-red-500">*</span>
+                    </label>
+                    <textarea 
+                        @bind="RejectionReason"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                        rows="5"
+                        placeholder="Vui lòng nhập lý do chi tiết để chủ quán biết cần sửa gì..."
+                        disabled="@IsSubmitting">
+                    </textarea>
+                    <div class="text-xs text-gray-500 mt-1">
+                        @RejectionReason.Length / 500 ký tự
+                    </div>
+                </div>
+
+                <!-- Validation Message -->
+                @if (ShowValidation && string.IsNullOrWhiteSpace(RejectionReason))
+                {
+                    <div class="text-sm text-red-600 bg-red-50 p-2 rounded">
+                        ⚠️ Bắt buộc nhập lý do từ chối!
+                    </div>
+                }
+
+                <!-- Helper Text -->
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div class="text-xs text-gray-600">
+                        <strong>💡 Tips khi từ chối:</strong>
+                        <ul class="list-disc list-inside mt-2 space-y-1">
+                            <li>Nêu rõ vấn đề cần sửa</li>
+                            <li>Góp ý mang tính xây dựng</li>
+                            <li>Đưa ra hướng dẫn cụ thể</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+                <button 
+                    @onclick="CloseModal"
+                    class="btn btn-secondary flex-1"
+                    disabled="@IsSubmitting">
+                    Hủy
+                </button>
+                <button 
+                    @onclick="SubmitRejectAsync"
+                    class="btn btn-reject flex-1"
+                    disabled="@IsSubmitting">
+                    @if (IsSubmitting)
+                    {
+                        <span>⏳ Đang xử lý...</span>
+                    }
+                    else
+                    {
+                        <span>❌ Từ chối</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<AdminPoiDto> OnPoiRejected { get; set; }
+
+    [Inject]
+    private IAdminService? AdminService { get; set; }
+
+    [Inject]
+    private ILogger<RejectPoiModal>? Logger { get; set; }
+
+    private AdminPoiDto? CurrentPoi;
+    private string RejectionReason = string.Empty;
+    private bool IsVisible = false;
+    private bool IsSubmitting = false;
+    private bool ShowValidation = false;
+
+    public void ShowModal(AdminPoiDto poi)
+    {
+        CurrentPoi = poi;
+        RejectionReason = string.Empty;
+        ShowValidation = false;
+        IsVisible = true;
+        StateHasChanged();
+    }
+
+    private void CloseModal()
+    {
+        IsVisible = false;
+        CurrentPoi = null;
+        RejectionReason = string.Empty;
+        ShowValidation = false;
+        StateHasChanged();
+    }
+
+    private async Task SubmitRejectAsync()
+    {
+        ShowValidation = true;
+
+        if (CurrentPoi == null || string.IsNullOrWhiteSpace(RejectionReason))
+            return;
+
+        IsSubmitting = true;
+
+        try
+        {
+            // If the call succeeds (no exception), the POI was rejected
+            await AdminService!.RejectPoiAsync(CurrentPoi.Id, RejectionReason);
+            await OnPoiRejected.InvokeAsync(CurrentPoi);
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError($"Error rejecting POI: {ex.Message}");
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private string GetModalClass()
+    {
+        return IsVisible ? "block" : "hidden";
+    }
+}

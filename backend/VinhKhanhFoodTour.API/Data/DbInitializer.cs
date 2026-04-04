@@ -7,38 +7,29 @@ namespace VinhKhanhFoodTour.Data
         public static void Initialize(AppDbContext context)
         {
             // Check if data already exists
-            if (context.Roles.Any())
-            {
-                return;
-            }
+            if (context.Roles.Any()) return;
 
             // Seed Roles
-            var roles = new Role[]
-            {
-                new Role { RoleName = "Admin" },
-                new Role { RoleName = "Owner" },
-                new Role { RoleName = "Tourist" }
-            };
-            foreach (var role in roles)
-            {
-                context.Roles.Add(role);
-            }
+            var adminRole = new Role { RoleName = "Admin" };
+            var ownerRole = new Role { RoleName = "Owner" };
+            context.Roles.AddRange(adminRole, ownerRole);
             context.SaveChanges();
 
             // Seed Users
-            var adminRole = context.Roles.FirstOrDefault(r => r.RoleName == "Admin");
-            var ownerRole = context.Roles.FirstOrDefault(r => r.RoleName == "Owner");
-
             var users = new User[]
             {
-                new User { Username = "admin_user", PasswordHash = "dummy_hash_for_demo", RoleId = adminRole.Id },
-                new User { Username = "owner_oanh", PasswordHash = "dummy_hash_for_demo", RoleId = ownerRole.Id },
-                new User { Username = "owner_vu", PasswordHash = "dummy_hash_for_demo", RoleId = ownerRole.Id }
+                new User {
+                    Username = "admin",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+                    RoleId = adminRole.Id
+                },
+                new User {
+                    Username = "owner1",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+                    RoleId = ownerRole.Id
+                }
             };
-            foreach (var user in users)
-            {
-                context.Users.Add(user);
-            }
+            context.Users.AddRange(users);
             context.SaveChanges();
 
             // Seed POIs

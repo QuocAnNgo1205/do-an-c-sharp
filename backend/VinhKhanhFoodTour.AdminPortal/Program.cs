@@ -1,10 +1,37 @@
 using VinhKhanhFoodTour.AdminPortal.Components;
+using VinhKhanhFoodTour.AdminPortal.Services.Auth;
+using VinhKhanhFoodTour.AdminPortal.Services.Http;
+using VinhKhanhFoodTour.AdminPortal.Services.Owner;
+using VinhKhanhFoodTour.AdminPortal.Services.Admin;
+using Blazored.LocalStorage;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options => options.DetailedErrors = true);
+
+// Register LocalStorage
+builder.Services.AddBlazoredLocalStorage();
+
+// Register HTTP Client and Services
+builder.Services.AddScoped<ApiClient>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AuthState>();
+builder.Services.AddScoped<IPoiService, PoiService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<ISyncService, SyncService>();
+
+// Configure logging
+builder.Services.AddLogging(config =>
+{
+    config.AddConsole();
+    config.SetMinimumLevel(LogLevel.Information);
+});
 
 var app = builder.Build();
 

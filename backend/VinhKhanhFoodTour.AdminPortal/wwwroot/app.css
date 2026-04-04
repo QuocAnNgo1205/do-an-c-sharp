@@ -1,32 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Styles */
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    @apply h-full;
 }
 
-a, .btn-link {
-    color: #006bb7;
+:root {
+    --primary-color: #0284c7;
+    --primary-dark: #0369a1;
 }
 
+/* Custom Components */
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    @apply px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition;
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+.btn-secondary {
+    @apply px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded transition;
 }
 
-.content {
-    padding-top: 1.1rem;
+.btn-danger {
+    @apply px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition;
 }
 
-h1:focus {
-    outline: none;
+.btn-success {
+    @apply px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded transition;
 }
 
-.valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+.card {
+    @apply bg-white rounded-lg shadow p-6;
 }
+
+.card-header {
+    @apply border-b border-gray-200 mb-4 pb-4;
+}
+
+.form-input {
+    @apply w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition;
+}
+
+.form-label {
+    @apply block text-gray-700 font-semibold mb-2;
+}
+
+.table-container {
+    @apply overflow-x-auto;
+}
+
+.table {
+    @apply w-full text-left text-sm text-gray-700;
+}
+
+.table thead {
+    @apply bg-gray-50 border-b border-gray-200;
+}
+
+.table thead th {
+    @apply px-6 py-3 font-semibold text-gray-900;
+}
+
+.table tbody tr {
+    @apply border-b border-gray-200 hover:bg-gray-50;
+}
+
+.table tbody td {
+    @apply px-6 py-4;
+}
+
+/* Alert Styles */
+.alert {
+    @apply p-4 rounded-lg;
+}
+
+.alert-success {
+    @apply bg-green-100 border-l-4 border-green-500 text-green-700;
+}
+
+.alert-error {
+    @apply bg-red-100 border-l-4 border-red-500 text-red-700;
+}
+
+.alert-warning {
+    @apply bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700;
+}
+
+.alert-info {
+    @apply bg-blue-100 border-l-4 border-blue-500 text-blue-700;
+}
+
+/* Loading Spinner */
+.spinner {
+    @apply inline-block animate-spin h-4 w-4 text-blue-600;
+}
+
+/* Modal Styles */
+.modal {
+    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
+
+.modal-content {
+    @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4;
+}
+
+.modal-header {
+    @apply border-b border-gray-200 p-6;
+}
+
+.modal-body {
+    @apply p-6;
+}
+
+.modal-footer {
+    @apply border-t border-gray-200 p-6 flex gap-3 justify-end;
+}
+
 
 .invalid {
     outline: 1px solid #e50000;

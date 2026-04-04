@@ -1,0 +1,85 @@
+@using System.Collections.Generic
+
+<div class="fixed top-4 right-4 z-50 space-y-2">
+    @foreach (var notification in NotificationList)
+    {
+        <div class="notification @GetNotificationClass(notification.Type)" role="alert">
+            <div class="flex items-start gap-3">
+                <span class="text-xl">@GetNotificationIcon(notification.Type)</span>
+                <div class="flex-1">
+                    <div class="font-semibold">@notification.Title</div>
+                    <div class="text-sm opacity-90">@notification.Message</div>
+                </div>
+                <button @onclick="() => RemoveNotification(notification.Id)" class="text-lg opacity-70 hover:opacity-100">
+                    ×
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    public class NotificationItem
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public NotificationType Type { get; set; } = NotificationType.Info;
+        public int DurationMs { get; set; } = 5000;
+    }
+
+    public enum NotificationType
+    {
+        Success,
+        Error,
+        Warning,
+        Info
+    }
+
+    public List<NotificationItem> NotificationList { get; set; } = new();
+
+    public void ShowNotification(string title, string message, NotificationType type = NotificationType.Info, int durationMs = 5000)
+    {
+        var notification = new NotificationItem
+        {
+            Title = title,
+            Message = message,
+            Type = type,
+            DurationMs = durationMs
+        };
+
+        NotificationList.Add(notification);
+        StateHasChanged();
+
+        Task.Delay(durationMs).ContinueWith(_ =>
+        {
+            RemoveNotification(notification.Id);
+        });
+    }
+
+    public void RemoveNotification(string id)
+    {
+        var notification = NotificationList.FirstOrDefault(n => n.Id == id);
+        if (notification != null)
+        {
+            NotificationList.Remove(notification);
+            StateHasChanged();
+        }
+    }
+
+    private string GetNotificationClass(NotificationType type) => type switch
+    {
+        NotificationType.Success => "notification-success",
+        NotificationType.Error => "notification-error",
+        NotificationType.Warning => "notification-warning",
+        _ => "notification-info"
+    };
+
+    private string GetNotificationIcon(NotificationType type) => type switch
+    {
+        NotificationType.Success => "✅",
+        NotificationType.Error => "❌",
+        NotificationType.Warning => "⚠️",
+        _ => "ℹ️"
+    };
+}

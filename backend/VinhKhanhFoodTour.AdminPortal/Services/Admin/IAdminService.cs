@@ -1,0 +1,44 @@
+namespace VinhKhanhFoodTour.AdminPortal.Services.Admin;
+
+/// <summary>
+/// DTO for Admin POI - matches backend PoiDto response from GET /api/v1/Poi/pending
+/// </summary>
+public class AdminPoiDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public int Status { get; set; }
+    public string? RejectionReason { get; set; }
+}
+
+/// <summary>
+/// DTO matching backend's approval/rejection response: { Message, Id }
+/// </summary>
+public class PoiActionResponseDto
+{
+    public string Message { get; set; } = string.Empty;
+    public int? Id { get; set; }
+}
+
+/// <summary>
+/// Service interface for admin operations on POIs
+/// </summary>
+public interface IAdminService
+{
+    /// <summary>
+    /// Get all POIs with Pending status
+    /// </summary>
+    Task<List<AdminPoiDto>> GetAllPendingPoisAsync();
+
+    /// <summary>
+    /// Approve a pending POI
+    /// </summary>
+    Task<PoiActionResponseDto> ApprovePoisAsync(int id);
+
+    /// <summary>
+    /// Reject a pending POI with a reason
+    /// </summary>
+    Task<PoiActionResponseDto> RejectPoiAsync(int id, string reason);
+}

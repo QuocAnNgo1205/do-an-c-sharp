@@ -1,0 +1,75 @@
+@using VinhKhanhFoodTour.AdminPortal.Services.Auth
+
+<aside class="w-64 bg-slate-900 text-white shadow-lg flex flex-col">
+    <!-- Logo / Brand -->
+    <div class="p-6 border-b border-slate-700">
+        <h1 class="text-2xl font-bold">Vinh Khanh</h1>
+        <p class="text-sm text-slate-400 mt-1">Food Tour CMS</p>
+    </div>
+
+    <!-- Menu Items -->
+    <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+        @if (AuthState?.IsAuthenticated == true)
+        {
+            @if (AuthState.IsOwner)
+            {
+                <!-- Owner Menu -->
+                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                    <span class="icon">🏠</span>
+                    <span>My Restaurants</span>
+                </NavLink>
+                
+                <NavLink class="nav-link" href="/statistics">
+                    <span class="icon">📊</span>
+                    <span>Listen Statistics</span>
+                </NavLink>
+            }
+            else if (AuthState.IsAdmin)
+            {
+                <!-- Admin Menu -->
+                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                    <span class="icon">✓</span>
+                    <span>Approve Restaurants</span>
+                </NavLink>
+                
+                <NavLink class="nav-link" href="/sync">
+                    <span class="icon">⚙️</span>
+                    <span>System Management</span>
+                </NavLink>
+            }
+        }
+    </nav>
+
+    <!-- Bottom Section -->
+    <div class="border-t border-slate-700 p-4">
+        @if (AuthState?.IsAuthenticated == true)
+        {
+            <div class="mb-4 pb-4 border-b border-slate-700">
+                <p class="text-xs text-slate-400 uppercase tracking-wide">Logged in as</p>
+                <p class="font-semibold text-white">@AuthState.CurrentUser?.Username</p>
+                <p class="text-xs text-slate-400">@AuthState.CurrentUser?.Role</p>
+            </div>
+            
+            <button @onclick="LogoutAsync" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-sm font-medium transition">
+                Logout
+            </button>
+        }
+    </div>
+</aside>
+
+@code {
+    [CascadingParameter]
+    private AuthState? AuthState { get; set; }
+
+    [Inject]
+    private AuthService AuthService { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private async Task LogoutAsync()
+    {
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+}

@@ -25,7 +25,7 @@ namespace VinhKhanhFoodTour.API.Controllers
             _context = context;
             _env = env;
             _syncService = syncService;
-            _offlinePacksDirectory = Path.Combine(_env.WebRootPath, "offline-packs");
+            _offlinePacksDirectory = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "offline-packs");
         }
 
         // API: Check Latest Version of Approved POIs
@@ -221,7 +221,7 @@ namespace VinhKhanhFoodTour.API.Controllers
             try
             {
                 // Trỏ tới file text chứa mã SHA-256 mà hàm Generate Pack đã tạo ra
-                var hashFilePath = Path.Combine(_env.WebRootPath, "offline-packs", "VinhKhanh_OfflinePack.sha256.txt");
+                var hashFilePath = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "offline-packs", "VinhKhanh_OfflinePack.sha256.txt");
 
                 // Trường hợp Admin chưa từng bấm Generate lần nào
                 if (!System.IO.File.Exists(hashFilePath))

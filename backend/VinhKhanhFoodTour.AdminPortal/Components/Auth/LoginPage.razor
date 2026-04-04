@@ -1,0 +1,136 @@
+@page "/login"
+@using VinhKhanhFoodTour.AdminPortal.Services.Auth
+@using VinhKhanhFoodTour.AdminPortal.Models.Auth
+@layout EmptyLayout
+
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700">
+    <div class="w-full max-w-md">
+        <!-- Login Card -->
+        <div class="bg-white rounded-lg shadow-xl p-8">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Vinh Khanh</h1>
+                <p class="text-gray-600">Food Tour Management System</p>
+            </div>
+
+            <!-- Login Form -->
+            <form @onsubmit="HandleLoginAsync">
+                <!-- Username -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">Username</label>
+                    <input 
+                        type="text" 
+                        @bind="Username"
+                        placeholder="Enter your username"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                        disabled="@IsLoading"
+                    />
+                </div>
+
+                <!-- Password -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">Password</label>
+                    <input 
+                        type="password" 
+                        @bind="Password"
+                        placeholder="Enter your password"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                        disabled="@IsLoading"
+                    />
+                </div>
+
+                <!-- Error Message -->
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div class="mb-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded">
+                        <p class="font-semibold">Login Failed</p>
+                        <p>@ErrorMessage</p>
+                    </div>
+                }
+
+                <!-- Login Button -->
+                <button 
+                    type="submit" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+                    disabled="@IsLoading"
+                >
+                    @if (IsLoading)
+                    {
+                        <span>Logging in...</span>
+                    }
+                    else
+                    {
+                        <span>Login</span>
+                    }
+                </button>
+            </form>
+
+            <!-- Demo Credentials Info -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <p class="text-xs text-gray-600 mb-3">Test Credentials:</p>
+                <div class="space-y-2 text-xs text-gray-700 bg-gray-50 p-3 rounded">
+                    <div><strong>Admin:</strong> username: admin, password: 0</div>
+                    <div><strong>Owner:</strong> username: owner1, password: 1</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    private AuthService AuthService { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private AuthState AuthState { get; set; } = default!;
+
+    private string Username = string.Empty;
+    private string Password = string.Empty;
+    private string ErrorMessage = string.Empty;
+    private bool IsLoading = false;
+
+    protected override void OnInitialized()
+    {
+        // If already logged in, redirect to home
+        if (AuthState.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        ErrorMessage = string.Empty;
+        IsLoading = true;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
+            {
+                ErrorMessage = "Username and password are required.";
+                return;
+            }
+
+            var success = await AuthService.LoginAsync(Username, Password);
+            if (success)
+            {
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                ErrorMessage = "Invalid username or password.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

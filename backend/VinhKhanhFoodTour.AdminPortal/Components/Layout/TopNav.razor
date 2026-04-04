@@ -1,0 +1,40 @@
+@using VinhKhanhFoodTour.AdminPortal.Services.Auth
+
+<header class="bg-white shadow-sm border-b border-gray-200">
+    <div class="flex items-center justify-between h-16 px-6">
+        <!-- Breadcrumb / Title -->
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800">
+                @GetPageTitle()
+            </h2>
+        </div>
+
+        <!-- Right Side Actions -->
+        <div class="flex items-center gap-4">
+            @if (AuthState?.IsAuthenticated == true)
+            {
+                <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <span class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+                        @(AuthState.CurrentUser?.Username?.FirstOrDefault().ToString().ToUpper() ?? "?")
+                    </span>
+                    <span>@AuthState.CurrentUser?.Username</span>
+                </div>
+            }
+        </div>
+    </div>
+</header>
+
+@code {
+    [CascadingParameter]
+    private AuthState? AuthState { get; set; }
+
+    private string GetPageTitle()
+    {
+        return AuthState?.CurrentUser?.Role switch
+        {
+            "Owner" => "My Restaurants",
+            "Admin" => "Approve Restaurants",
+            _ => "Dashboard"
+        };
+    }
+}

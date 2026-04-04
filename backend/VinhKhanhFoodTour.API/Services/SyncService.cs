@@ -29,7 +29,7 @@ namespace VinhKhanhFoodTour.API.Services
             _context = context;
             _env = env;
             _logger = logger;
-            _offlinePacksDirectory = Path.Combine(_env.WebRootPath, "offline-packs");
+            _offlinePacksDirectory = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "offline-packs");
         }
 
         public async Task GenerateOfflinePackAsync()
@@ -193,7 +193,7 @@ namespace VinhKhanhFoodTour.API.Services
             }
 
             var cleanPath = relativePath.TrimStart('/');
-            var physicalPath = Path.Combine(_env.WebRootPath, cleanPath);
+            var physicalPath = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), cleanPath);
             if (!File.Exists(physicalPath))
             {
                 _logger.LogWarning("Media file missing while generating pack: {Path}", relativePath);

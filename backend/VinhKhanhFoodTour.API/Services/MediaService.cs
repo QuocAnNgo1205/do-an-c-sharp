@@ -24,7 +24,7 @@ namespace VinhKhanhFoodTour.API.Services
                 }
 
                 var uniqueImageFileName = $"{Guid.NewGuid()}{imageExtension}";
-                var imageDirectory = Path.Combine(_env.WebRootPath, "uploads", "images");
+                var imageDirectory = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "uploads", "images");
                 Directory.CreateDirectory(imageDirectory);
                 var imagePhysicalPath = Path.Combine(imageDirectory, uniqueImageFileName);
 
@@ -46,7 +46,7 @@ namespace VinhKhanhFoodTour.API.Services
                 }
 
                 var uniqueAudioFileName = $"{Guid.NewGuid()}{audioExtension}";
-                var audioDirectory = Path.Combine(_env.WebRootPath, "uploads", "audio");
+                var audioDirectory = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "uploads", "audio");
                 Directory.CreateDirectory(audioDirectory);
                 var audioPhysicalPath = Path.Combine(audioDirectory, uniqueAudioFileName);
 

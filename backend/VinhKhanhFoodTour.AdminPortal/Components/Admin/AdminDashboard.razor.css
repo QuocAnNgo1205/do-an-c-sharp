@@ -1,0 +1,162 @@
+.card {
+    @apply bg-white rounded-lg shadow-md p-6 border border-gray-100;
+}
+
+.card-header {
+    @apply pb-4 border-b border-gray-200 mb-4;
+}
+
+.table-container {
+    @apply overflow-x-auto;
+}
+
+.table {
+    @apply w-full text-left;
+}
+
+.table thead {
+    @apply bg-gray-50;
+}
+
+.table th {
+    @apply px-6 py-3 font-semibold text-gray-700 text-sm;
+}
+
+.table tbody tr {
+    @apply border-t border-gray-200 hover:bg-gray-50 transition-colors;
+}
+
+.table td {
+    @apply px-6 py-4 text-sm;
+}
+
+.btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer;
+}
+
+.btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:bg-gray-300 disabled:cursor-not-allowed;
+}
+
+/* Approve button - Green */
+.btn-approve {
+    @apply bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed;
+}
+
+/* Reject button - Red */
+.btn-reject {
+    @apply bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed;
+}
+
+.badge {
+    @apply inline-block px-3 py-1 rounded-full text-xs font-semibold;
+}
+
+.badge-success {
+    @apply bg-green-100 text-green-800;
+}
+
+.badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+}
+
+.badge-error {
+    @apply bg-red-100 text-red-800;
+}
+
+.badge-info {
+    @apply bg-blue-100 text-blue-800;
+}
+
+.spinner {
+    @apply inline-block animate-spin;
+}
+
+/* Loading dot spinner */
+.spinner-dot {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Admin-specific styles */
+.status-indicator {
+    @apply w-4 h-4 rounded-full inline-block;
+}
+
+.status-healthy {
+    @apply bg-green-500;
+}
+
+.status-running {
+    @apply bg-yellow-500 animate-pulse;
+}
+
+.status-error {
+    @apply bg-red-500;
+}
+
+.status-unknown {
+    @apply bg-gray-400;
+}
+
+/* Modal styles */
+.modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 z-40;
+}
+
+.modal-content {
+    @apply bg-white rounded-lg shadow-xl max-w-md w-full;
+}
+
+.modal-header {
+    @apply flex items-center justify-between px-6 py-4 border-b border-gray-200;
+}
+
+.modal-body {
+    @apply px-6 py-4 space-y-4;
+}
+
+.modal-footer {
+    @apply flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50;
+}
+
+.form-label {
+    @apply block text-sm font-medium text-gray-700 mb-2;
+}
+
+.form-input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+textarea.form-input {
+    @apply resize-none;
+}
+
+/* Status colors for sync display */
+.sync-status-card {
+    @apply p-6 rounded-lg border-2 border-gray-200;
+}
+
+.sync-status-healthy {
+    @apply bg-green-50 border-green-300 border-opacity-50;
+}
+
+.sync-status-error {
+    @apply bg-red-50 border-red-300 border-opacity-50;
+}
+
+.sync-status-running {
+    @apply bg-yellow-50 border-yellow-300 border-opacity-50;
+}
