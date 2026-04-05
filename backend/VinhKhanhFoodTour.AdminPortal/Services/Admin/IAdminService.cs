@@ -1,3 +1,5 @@
+using VinhKhanhFoodTour.AdminPortal.Models.Auth;
+
 namespace VinhKhanhFoodTour.AdminPortal.Services.Admin;
 
 /// <summary>
@@ -41,4 +43,14 @@ public interface IAdminService
     /// Reject a pending POI with a reason
     /// </summary>
     Task<PoiActionResponseDto> RejectPoiAsync(int id, string reason);
+
+    /// <summary>
+    /// Get all users in the system (Admin only)
+    /// </summary>
+    Task<List<UserDto>> GetUsersAsync();
+
+    /// <summary>
+    /// Toggle the IsActive status of a user (Admin only)
+    /// </summary>
+    Task<UserToggleResponseDto> ToggleUserStatusAsync(int id);
 }

@@ -11,13 +11,13 @@
 
         <!-- Right Side Actions -->
         <div class="flex items-center gap-4">
-            @if (AuthState?.IsAuthenticated == true)
+            @if (AuthState?.IsAuthenticated == true && AuthState.CurrentUser != null)
             {
                 <div class="flex items-center gap-2 text-sm text-gray-600">
                     <span class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
-                        @(AuthState.CurrentUser?.Username?.FirstOrDefault().ToString().ToUpper() ?? "?")
+                        @(AuthState.CurrentUser?.Username?.FirstOrDefault().ToString()?.ToUpper() ?? "?")
                     </span>
-                    <span>@AuthState.CurrentUser?.Username</span>
+                    <span>@(AuthState.CurrentUser?.Username ?? "Unknown User")</span>
                 </div>
             }
         </div>

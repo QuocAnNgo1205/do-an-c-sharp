@@ -49,7 +49,7 @@ public class AuthService
             };
 
             var response = await _apiClient.PostAsync<LoginResponse>(
-                "/api/v1/Auth/login",
+                "api/v1/Auth/login",
                 loginRequest);
 
             if (response?.Token == null)
@@ -80,6 +80,36 @@ public class AuthService
         {
             _logger.LogError($"Login exception: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Register a new owner account
+    /// </summary>
+    public async Task<(bool Success, string Message)> RegisterAsync(string username, string email, string password)
+    {
+        try
+        {
+            var registerRequest = new RegisterRequest
+            {
+                Username = username,
+                Email = email,
+                Password = password
+            };
+
+            var response = await _apiClient.PostAsync<RegisterResponse>(
+                "api/v1/Auth/register",
+                registerRequest);
+
+            return (true, response?.Message ?? "Đăng ký thành công!");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Registration exception: {ex.Message}");
+            
+            // Extract meaningful message from API if possible (e.g., duplicate username)
+            // The ApiClient might throw an exception with the error response body
+            return (false, ex.Message);
         }
     }
 

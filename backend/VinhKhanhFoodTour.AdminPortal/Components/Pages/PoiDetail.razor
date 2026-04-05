@@ -1,0 +1,304 @@
+@page "/poi/{PoiId:int}"
+@using VinhKhanhFoodTour.AdminPortal.Services.Common
+@using VinhKhanhFoodTour.AdminPortal.Models.Poi
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@inject IJSRuntime JS
+@inject ITranslationService TranslationService
+@inject IPoiService PoiService
+@inject IConfiguration Configuration
+
+<div class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
+    @if (ErrorMessage != null)
+    {
+        <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow-md mb-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700 font-medium">@ErrorMessage</p>
+                    <button @onclick="@(() => ErrorMessage = null)" class="mt-2 text-xs text-red-500 hover:underline">Thử lại</button>
+                    <a href="/owner/dashboard" class="ml-4 mt-2 text-xs text-blue-500 hover:underline">Quay lại Dashboard</a>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (poi == null && ErrorMessage == null)
+    {
+        <div class="flex flex-col items-center justify-center h-64 bg-white rounded-2xl shadow-xl">
+            <svg class="animate-spin h-10 w-10 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-gray-500 font-medium">Đang tải dữ liệu quán...</p>
+        </div>
+    }
+    else if (poi != null)
+    {
+        <!-- POI Header -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+            <div class="h-64 bg-gray-300 relative">
+                <!-- Hình ảnh POI -->
+                <img src="@(GetMainImageUrl())" 
+                     alt="@poi.Name" class="w-full h-full object-cover" />
+                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-white">
+                    <h1 class="text-3xl font-bold">@poi.Name</h1>
+                    <p class="text-sm opacity-90 mt-1">📍 @poi.Latitude.ToString("F4"), @poi.Longitude.ToString("F4")</p>
+                </div>
+            </div>
+
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="form-group flex-1 max-w-xs">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">🌍 Chọn ngôn ngữ</label>
+                        <select @bind="CurrentLang" @bind:after="OnLangChanged" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition">
+                            <option value="vi">🇻🇳 Tiếng Việt</option>
+                            <option value="en">🇬🇧 English</option>
+                            <option value="ja">🇯🇵 日本語</option>
+                            <option value="ko">🇰🇷 한국어</option>
+                            <option value="zh">🇨🇳 中文</option>
+                            <option value="fr">🇫🇷 Français</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Audio Player Controls -->
+                <div class="bg-blue-50 rounded-xl p-5 border border-blue-100 flex flex-col sm:flex-row items-center gap-4 mb-6">
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button @onclick="PlayAudioAsync" disabled="@IsBusy" class="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            @if (IsTranslating)
+                            {
+                                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Đang dịch...</span>
+                            }
+                            else
+                            {
+                                <span>▶ Nghe thuyết minh</span>
+                            }
+                        </button>
+                        
+                        <button @onclick="StopAudioAsync" class="flex items-center justify-center p-3 text-red-600 bg-red-100 hover:bg-red-200 rounded-lg transition" title="Dừng phát">
+                            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                        </button>
+                    </div>
+                    
+                    <div class="text-sm text-gray-600">
+                        <span class="font-medium text-blue-800">Trạng thái:</span> 
+                        @if (IsTranslating)
+                        {
+                            <span>Đang dịch tài liệu sang hệ thống TTS (@CurrentLang)...</span>
+                        }
+                        else if(AudioSourceUsed != null)
+                        {
+                            <span>Sẵn sàng phát (@AudioSourceUsed)</span>
+                        }
+                        else
+                        {
+                            <span>Sẵn sàng</span>
+                        }
+                    </div>
+                </div>
+
+                <!-- Context Description -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">@CurrentTitle</h3>
+                    <div class="prose max-w-none text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                        @if (IsTranslating)
+                        {
+                             <div class="animate-pulse flex space-x-4">
+                                <div class="flex-1 space-y-4 py-1">
+                                  <div class="h-2 bg-slate-200 rounded"></div>
+                                  <div class="space-y-3">
+                                    <div class="grid grid-cols-3 gap-4">
+                                      <div class="h-2 bg-slate-200 rounded col-span-2"></div>
+                                      <div class="h-2 bg-slate-200 rounded col-span-1"></div>
+                                    </div>
+                                    <div class="h-2 bg-slate-200 rounded"></div>
+                                  </div>
+                                </div>
+                              </div>
+                        }
+                        else
+                        {
+                             <p>@CurrentDescription</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int PoiId { get; set; }
+
+    private PoiDetailDto? poi = null;
+    private string? ErrorMessage = null;
+
+    private string CurrentLang { get; set; } = "vi";
+    private bool IsTranslating = false;
+    private bool IsBusy => IsTranslating;
+    private string? AudioSourceUsed = null;
+
+    private string CurrentTitle = "Giới thiệu";
+    private string CurrentDescription = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            poi = await PoiService.GetPoiByIdAsync(PoiId);
+            if (poi == null)
+            {
+                ErrorMessage = "Không tìm thấy quán ăn này hoặc quán chưa được duyệt.";
+            }
+            UpdateCurrentView();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Lỗi khi tải dữ liệu: {ex.Message}";
+            Console.WriteLine(ex);
+        }
+    }
+
+    private void OnLangChanged()
+    {
+        UpdateCurrentView();
+        _ = StopAudioAsync();
+    }
+
+    private string GetAbsoluteUrl(string? relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath)) return "";
+        if (relativePath.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return relativePath;
+
+        var baseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5007";
+        return $"{baseUrl.TrimEnd('/')}/{relativePath.TrimStart('/')}";
+    }
+
+    private string GetMainImageUrl()
+    {
+        if (poi == null || poi.Translations == null || !poi.Translations.Any()) 
+            return "https://images.unsplash.com/photo-1555126634-ae323dd85303?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80";
+
+        var viTranslation = poi.Translations.FirstOrDefault(t => t.LanguageCode == "vi");
+        if (viTranslation != null && !string.IsNullOrEmpty(viTranslation.ImageUrl))
+        {
+            return GetAbsoluteUrl(viTranslation.ImageUrl);
+        }
+
+        var anyTranslationWithImage = poi.Translations.FirstOrDefault(t => !string.IsNullOrEmpty(t.ImageUrl));
+        if (anyTranslationWithImage != null)
+        {
+            return GetAbsoluteUrl(anyTranslationWithImage.ImageUrl!);
+        }
+
+        return "https://images.unsplash.com/photo-1555126634-ae323dd85303?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80";
+    }
+
+    private void UpdateCurrentView()
+    {
+        if (poi == null || poi.Translations == null) return;
+
+        AudioSourceUsed = null;
+        var info = poi.Translations.FirstOrDefault(t => t.LanguageCode == CurrentLang);
+
+        if (info != null && !string.IsNullOrEmpty(info.Description))
+        {
+            CurrentTitle = string.IsNullOrEmpty(info.Title) ? "Giới thiệu" : info.Title;
+            CurrentDescription = info.Description;
+        }
+        else
+        {
+            var defaultVi = poi.Translations.FirstOrDefault(t => t.LanguageCode == "vi");
+            CurrentTitle = defaultVi != null && !string.IsNullOrEmpty(defaultVi.Title) ? defaultVi.Title : "Giới thiệu";
+            CurrentDescription = "(Bản dịch chưa có sẵn. Bấm Nghe Thuyết Minh để hệ thống tự động dịch và phát âm)";
+        }
+    }
+
+    // -- 3-Level Fallback Logic --
+    private async Task PlayAudioAsync()
+    {
+        if (IsBusy || poi == null) return;
+        IsTranslating = false;
+
+        var info = poi.Translations.FirstOrDefault(t => t.LanguageCode == CurrentLang);
+
+        // BƯỚC 1: Tìm xem có Audio File không
+        if (info != null && !string.IsNullOrEmpty(info.AudioFilePath))
+        {
+            AudioSourceUsed = "MP3 Audio File";
+            StateHasChanged();
+            var absoluteAudioUrl = GetAbsoluteUrl(info.AudioFilePath);
+            await JS.InvokeVoidAsync("window.audioInterop.playAudioFile", absoluteAudioUrl);
+            return;
+        }
+
+        // BƯỚC 2: Tìm xem có Text Description (đã có sẵn) không
+        if (info != null && !string.IsNullOrEmpty(info.Description))
+        {
+            AudioSourceUsed = "Trình duyệt TTS (Text-to-Speech)";
+            StateHasChanged();
+            await JS.InvokeVoidAsync("window.audioInterop.playTextToSpeech", info.Description, CurrentLang);
+            return;
+        }
+
+        // BƯỚC 3: Nếu không có bản dịch -> Lấy Text mặc định (Tiếng Việt), gọi ITranslationService, sau đó phát TTS
+        var defaultVi = poi.Translations.FirstOrDefault(t => t.LanguageCode == "vi");
+        if (defaultVi == null || string.IsNullOrEmpty(defaultVi.Description))
+        {
+            Console.WriteLine("Lỗi: POI không có bài dịch tiếng Việt làm nền tảng.");
+            return;
+        }
+
+        IsTranslating = true;
+        AudioSourceUsed = "Dịch tự động AI + TTS";
+        StateHasChanged();
+
+        try
+        {
+            var defaultViText = defaultVi.Description;
+            var defaultViTitle = defaultVi.Title;
+            
+            // Gọi mock service dịch từ 'vi' sang CurrentLang
+            var translatedText = await TranslationService.TranslateAsync(defaultViText, "vi", CurrentLang);
+            var translatedTitle = await TranslationService.TranslateAsync(defaultViTitle, "vi", CurrentLang);
+            
+            // Update ui with new translation memory
+            CurrentDescription = translatedText;
+            CurrentTitle = translatedTitle;
+            
+            // Lưu lại vào in-memory POI db để lần bấm Play sau hoặc lần chuyển lại tab không phải dịch lại
+            poi.Translations.Add(new PoiDetailTranslationDto 
+            { 
+                LanguageCode = CurrentLang,
+                Title = translatedTitle,
+                Description = translatedText 
+            });
+            
+            IsTranslating = false;
+            StateHasChanged();
+
+            // Phát Audio Speech
+            await JS.InvokeVoidAsync("window.audioInterop.playTextToSpeech", translatedText, CurrentLang);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error translating: {ex.Message}");
+            IsTranslating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopAudioAsync()
+    {
+        await JS.InvokeVoidAsync("window.audioInterop.stopAudio");
+    }
+}

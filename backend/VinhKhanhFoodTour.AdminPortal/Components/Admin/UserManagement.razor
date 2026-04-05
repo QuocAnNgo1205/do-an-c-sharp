@@ -1,0 +1,220 @@
+@page "/admin/users"
+@using VinhKhanhFoodTour.AdminPortal.Services.Admin
+@using VinhKhanhFoodTour.AdminPortal.Models.Auth
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>User Management - Admin</PageTitle>
+
+<Notifications @ref="NotificationComponent" />
+
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">User Management</h1>
+            <p class="text-gray-600 mt-1">Manage system accounts, roles, and access.</p>
+        </div>
+        <button @onclick="LoadUsersAsync" class="btn btn-secondary" disabled="@IsLoading">
+            🔄 Refresh
+        </button>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-xl font-bold text-gray-800">System Users</h2>
+        </div>
+        
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User Info</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (IsLoading)
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-8 text-gray-500">
+                                <div class="spinner-dot mx-auto mb-3"></div>
+                                Loading users...
+                            </td>
+                        </tr>
+                    }
+                    else if (Users == null || Users.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-8 text-gray-500">
+                                No users found in the system.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var user in Users.Where(u => u != null))
+                        {
+                            <tr>
+                                <td>
+                                    <span class="text-xs font-mono text-gray-500">#@user.Id</span>
+                                </td>
+                                <td>
+                                    <div>
+                                        <div class="font-medium text-gray-900">@(user.Username ?? "Unknown")</div>
+                                        @if (!string.IsNullOrEmpty(user.Email))
+                                        {
+                                            <div class="text-sm text-gray-500">@user.Email</div>
+                                        }
+                                        else 
+                                        {
+                                            <div class="text-xs text-gray-400 italic">No email provided</div>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="@GetRoleBadgeClass(user.RoleName)">
+                                        @(user.RoleName ?? "Unknown")
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (user.IsActive)
+                                    {
+                                        <span class="badge badge-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-error">Blocked</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button 
+                                        class="@(user.IsActive ? "btn btn-reject text-sm" : "btn btn-approve text-sm")" 
+                                        @onclick="() => ToggleUserStatusAsync(user)"
+                                        disabled="@(ProcessingUserId == user.Id || (user.RoleName == "Admin" && user.IsActive))"
+                                        title="@(user.RoleName == "Admin" && user.IsActive ? "Cannot block an active admin directly" : "")">
+                                        
+                                        @if (ProcessingUserId == user.Id)
+                                        {
+                                            <span>⏳ Processing...</span>
+                                        }
+                                        else if (user.IsActive)
+                                        {
+                                            <span>🔒 Block</span>
+                                        }
+                                        else
+                                        {
+                                            <span>🔓 Unblock</span>
+                                        }
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    private IAdminService? AdminService { get; set; }
+
+    private Notifications? NotificationComponent { get; set; }
+
+    private List<UserDto> Users = new();
+    private bool IsLoading = true;
+    private bool _isInitialized = false;
+    private int? ProcessingUserId = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isInitialized) return;
+        _isInitialized = true;
+
+        try
+        {
+            await LoadUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in UserManagement OnInitializedAsync: {ex}");
+            NotificationComponent?.ShowNotification(
+                "Error",
+                "Failed to initialize user management.",
+                Notifications.NotificationType.Error
+            );
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        if (AdminService == null) return;
+
+        IsLoading = true;
+        try
+        {
+            Users = await AdminService.GetUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception loading users: {ex}");
+            NotificationComponent?.ShowNotification(
+                "Error",
+                "Failed to load user list from server.",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            IsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ToggleUserStatusAsync(UserDto user)
+    {
+        if (user == null || AdminService == null) return;
+
+        ProcessingUserId = user.Id;
+        try
+        {
+            var result = await AdminService.ToggleUserStatusAsync(user.Id);
+            
+            // Toggle local state to avoid full reload
+            user.IsActive = !user.IsActive;
+
+            NotificationComponent?.ShowNotification(
+                "Success",
+                result.Message ?? "User status updated successfully.",
+                Notifications.NotificationType.Success
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception toggling user: {ex}");
+            NotificationComponent?.ShowNotification(
+                "Error",
+                "Failed to update user status. Cannot block the last admin.",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            ProcessingUserId = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string GetRoleBadgeClass(string roleName) => roleName switch
+    {
+        "Admin" => "badge bg-purple-100 text-purple-800 border-purple-200",
+        "Owner" => "badge badge-info",
+        _ => "badge badge-warning" // Tourist or unknown
+    };
+}

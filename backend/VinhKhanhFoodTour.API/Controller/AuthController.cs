@@ -62,12 +62,56 @@ namespace VinhKhanhFoodTour.API.Controllers
                 Expiration = token.ValidTo
             });
         }
+
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        {
+            // 1. Kiểm tra username hoặc email đã tồn tại chưa
+            if (await _context.Users.AnyAsync(u => u.Username == request.Username))
+            {
+                return BadRequest(new { Message = "Username đã tồn tại!" });
+            }
+
+            if (!string.IsNullOrEmpty(request.Email) && await _context.Users.AnyAsync(u => u.Email == request.Email))
+            {
+                return BadRequest(new { Message = "Email đã tồn tại!" });
+            }
+
+            // 2. Tìm Role "Owner" trong DB
+            var ownerRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Owner");
+            if (ownerRole == null)
+            {
+                return StatusCode(500, new { Message = "Lỗi hệ thống: Không tìm thấy Role Owner!" });
+            }
+
+            // 3. Tạo User mới
+            var user = new VinhKhanhFoodTour.Models.User
+            {
+                Username = request.Username,
+                Email = request.Email,
+                PasswordHash = request.Password, // Lưu trơn theo cơ chế hiện tại
+                RoleId = ownerRole.Id,
+                IsActive = true
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Đăng ký thành công!" });
+        }
     }
 
     // Class phụ để nhận data từ Frontend gửi lên
     public class LoginRequest
     {
         public string Username { get; set; } = null!;
+        public string Password { get; set; } = null!;
+    }
+
+    public class RegisterRequest
+    {
+        public string Username { get; set; } = null!;
+        public string Email { get; set; } = null!;
         public string Password { get; set; } = null!;
     }
 }

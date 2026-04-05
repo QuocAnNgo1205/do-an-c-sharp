@@ -3,6 +3,7 @@ using VinhKhanhFoodTour.AdminPortal.Services.Auth;
 using VinhKhanhFoodTour.AdminPortal.Services.Http;
 using VinhKhanhFoodTour.AdminPortal.Services.Owner;
 using VinhKhanhFoodTour.AdminPortal.Services.Admin;
+using VinhKhanhFoodTour.AdminPortal.Services.Common;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +25,8 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuthState>();
 builder.Services.AddScoped<IPoiService, PoiService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
-builder.Services.AddScoped<ISyncService, SyncService>();
+
+builder.Services.AddScoped<ITranslationService, TranslationService>();
 
 // Configure logging
 builder.Services.AddLogging(config =>

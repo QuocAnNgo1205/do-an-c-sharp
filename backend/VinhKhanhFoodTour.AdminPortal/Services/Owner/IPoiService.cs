@@ -1,3 +1,5 @@
+using VinhKhanhFoodTour.AdminPortal.Models.Poi;
+
 namespace VinhKhanhFoodTour.AdminPortal.Services.Owner;
 
 public interface IPoiService
@@ -21,6 +23,11 @@ public interface IPoiService
     /// Get listen statistics for owner's POIs
     /// </summary>
     Task<List<PoiListenStatsDto>> GetListenStatsAsync();
+
+    /// <summary>
+    /// Get public POI details by ID
+    /// </summary>
+    Task<PoiDetailDto?> GetPoiByIdAsync(int id);
 }
 
 public class PoiDto
@@ -30,8 +37,8 @@ public class PoiDto
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public int TriggerRadius { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
+    public int Status { get; set; }
+    public DateTime? CreatedAt { get; set; }
     public string? ImageUrl { get; set; }
     public List<PoiTranslationDto> Translations { get; set; } = [];
 }

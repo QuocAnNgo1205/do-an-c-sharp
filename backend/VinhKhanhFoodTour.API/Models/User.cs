@@ -18,6 +18,12 @@ namespace VinhKhanhFoodTour.Models
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
 
+        [EmailAddress]
+        [MaxLength(200)]
+        public string? Email { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
         // Navigation Properties
         [ForeignKey("RoleId")]
         public virtual Role? Role { get; set; }

@@ -1,5 +1,6 @@
 using VinhKhanhFoodTour.AdminPortal.Services.Http;
 using Microsoft.Extensions.Logging;
+using VinhKhanhFoodTour.AdminPortal.Models.Auth;
 
 namespace VinhKhanhFoodTour.AdminPortal.Services.Admin;
 
@@ -57,6 +58,34 @@ public class AdminService : IAdminService
         catch (Exception ex)
         {
             _logger.LogError($"Error rejecting POI {id}: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<List<UserDto>> GetUsersAsync()
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<UserDto>>("api/v1/Users");
+            return result ?? new List<UserDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching users: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<UserToggleResponseDto> ToggleUserStatusAsync(int id)
+    {
+        try
+        {
+            var result = await _apiClient.PutAsync<UserToggleResponseDto>($"api/v1/Users/{id}/toggle-status", new { });
+            return result ?? new UserToggleResponseDto { Message = "User status toggled successfully." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error toggling user {id}: {ex.Message}");
             throw;
         }
     }

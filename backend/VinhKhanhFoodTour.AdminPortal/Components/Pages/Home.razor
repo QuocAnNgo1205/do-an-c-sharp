@@ -1,21 +1,28 @@
-﻿@page "/"
+@page "/"
 @using VinhKhanhFoodTour.AdminPortal.Services.Auth
 
 <PageTitle>Home - Vinh Khanh CMS</PageTitle>
 
 <ProtectedRoute>
-    @if (AuthState?.IsOwner == true)
+    @if (AuthState == null || !AuthState.IsAuthenticated)
+    {
+        <div class="text-center py-10">
+            <div class="spinner mb-4"></div>
+            <p class="text-gray-600">Verifying authentication...</p>
+        </div>
+    }
+    else if (AuthState.IsOwner)
     {
         <OwnerDashboard />
     }
-    else if (AuthState?.IsAdmin == true)
+    else if (AuthState.IsAdmin)
     {
         <AdminDashboard />
     }
     else
     {
-        <div class="text-center py-10">
-            <p class="text-gray-600">Unknown role or user not authenticated.</p>
+        <div class="text-center py-10 text-red-500">
+            <p>Access denied: Invalid role.</p>
         </div>
     }
 </ProtectedRoute>

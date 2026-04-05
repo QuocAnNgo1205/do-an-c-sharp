@@ -1,0 +1,146 @@
+@page "/owner/statistics"
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@attribute [Authorize(Roles = "Owner")]
+
+<PageTitle>Listen Statistics - My Restaurants</PageTitle>
+
+<Notifications @ref="NotificationComponent" />
+
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Listen Statistics</h1>
+            <p class="text-gray-600 mt-1">Leaderboard of narration engagements for your restaurants.</p>
+        </div>
+        <button @onclick="LoadStatisticsAsync" class="btn btn-secondary" disabled="@IsLoading">
+            🔄 Refresh
+        </button>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="text-xl font-bold text-gray-800">Top Restaurants by Listens</h2>
+        </div>
+        
+        <div class="p-6">
+            @if (IsLoading)
+            {
+                <div class="text-center py-8 text-gray-500">
+                    <div class="spinner-dot mx-auto mb-3"></div>
+                    Loading statistics...
+                </div>
+            }
+            else if (ListenStats == null || ListenStats.Count == 0)
+            {
+                <div class="text-center py-8 text-gray-500">
+                    <p class="text-lg">No playback statistics found.</p>
+                    <p class="text-sm mt-2">Make sure your restaurants are approved and have narrations uploaded.</p>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-6">
+                    @foreach (var stat in ListenStats.Where(s => s != null).OrderByDescending(s => s.ListenCount))
+                    {
+                        var percentage = GetProgressBarWidth(stat.ListenCount);
+                        
+                        <div class="flex items-center gap-4">
+                            <!-- Rank or Icon -->
+                            <div class="w-8 text-center font-bold text-gray-400">
+                                @if (percentage == 100 && stat.ListenCount > 0)
+                                {
+                                    <span class="text-yellow-500 text-xl">👑</span>
+                                }
+                                else
+                                {
+                                    <span>#</span>
+                                }
+                            </div>
+                            
+                            <!-- Progress Bar Container -->
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-1">
+                                    <span class="font-medium text-gray-800">@(stat.PoiName ?? "Unknown Restaurant")</span>
+                                    <span class="font-bold text-blue-600">@stat.ListenCount <span class="text-xs font-normal text-gray-500">listens</span></span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
+                                    <div class="bg-blue-500 h-4 rounded-full transition-all duration-1000 ease-out" 
+                                         style="width: @(percentage)%">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    private IPoiService? PoiService { get; set; }
+
+    private Notifications? NotificationComponent { get; set; }
+
+    private List<PoiListenStatsDto> ListenStats = new();
+    private bool IsLoading = true;
+    private bool _isInitialized = false;
+    private int MaxCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (_isInitialized) return;
+        _isInitialized = true;
+
+        try
+        {
+            await LoadStatisticsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in ListenStatistics OnInitializedAsync: {ex}");
+            NotificationComponent?.ShowNotification(
+                "Error",
+                "Failed to initialize statistics page.",
+                Notifications.NotificationType.Error
+            );
+        }
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        if (PoiService == null) return;
+
+        IsLoading = true;
+        try
+        {
+            ListenStats = await PoiService.GetListenStatsAsync();
+            MaxCount = ListenStats?.Count > 0 ? ListenStats.Max(s => s.ListenCount) : 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception loading ListenStats: {ex}");
+            NotificationComponent?.ShowNotification(
+                "Error",
+                "Failed to load statistics from server.",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            IsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private int GetProgressBarWidth(int listenCount)
+    {
+        if (MaxCount == 0 || listenCount == 0) return 3; // Minimum width for visibility
+        double percentage = ((double)listenCount / MaxCount) * 100;
+        return (int)Math.Max(3, Math.Min(100, Math.Round(percentage)));
+    }
+}

@@ -49,7 +49,7 @@
         };
 
         NotificationList.Add(notification);
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
 
         Task.Delay(durationMs).ContinueWith(_ =>
         {
@@ -63,7 +63,7 @@
         if (notification != null)
         {
             NotificationList.Remove(notification);
-            StateHasChanged();
+            InvokeAsync(StateHasChanged);
         }
     }
 

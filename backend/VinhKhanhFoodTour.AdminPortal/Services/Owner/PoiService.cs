@@ -1,6 +1,7 @@
 using VinhKhanhFoodTour.AdminPortal.Services.Http;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
+using VinhKhanhFoodTour.AdminPortal.Models.Poi;
 
 namespace VinhKhanhFoodTour.AdminPortal.Services.Owner;
 
@@ -69,6 +70,20 @@ public class PoiService : IPoiService
         {
             _logger.LogError($"Error fetching listen stats: {ex.Message}");
             throw;
+        }
+    }
+
+    public async Task<PoiDetailDto?> GetPoiByIdAsync(int id)
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<PoiDetailDto>($"api/v1/Poi/public/{id}");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching POI details for {id}: {ex.Message}");
+            return null;
         }
     }
 }
