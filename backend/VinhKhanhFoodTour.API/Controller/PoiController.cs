@@ -130,10 +130,16 @@ namespace VinhKhanhFoodTour.API.Controllers
             }
         }
 
-        // API: Chủ quán tạo một quán ăn mới (Owner/Admin)
+        // API: Chủ quán tạo một quán ăn mới (Owner/Admin) - Hỗ trợ upload ảnh
         [HttpPost("owner/create")]
         [Authorize(Roles = "Owner,Admin")]
-        public async Task<IActionResult> CreatePoi([FromBody] CreatePoiDto request)
+        public async Task<IActionResult> CreatePoi(
+            [FromForm] string name, 
+            [FromForm] double latitude, 
+            [FromForm] double longitude, 
+            [FromForm] string title, 
+            [FromForm] string description, 
+            IFormFile? imageFile)
         {
             try
             {
@@ -144,9 +150,45 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng." });
                 }
 
-                var newPoi = await _poiService.CreateOwnerPoiAsync(ownerId, request);
+                // 🔴 DEBUG: Log nhận dữ liệu
+                Console.WriteLine($"[CreatePoi] Received: Name={name}, ImageFile={imageFile?.FileName}, ImageFile.Length={imageFile?.Length}");
 
-                return CreatedAtAction(nameof(CreatePoi), new { id = newPoi.Id }, new { Message = "Đã tạo quán ăn thành công! Chờ Admin duyệt.", Id = newPoi.Id });
+                // 🔴 MỚI: Xử lý upload ảnh nếu có
+                string? imageUrl = null;
+                if (imageFile != null && imageFile.Length > 0)
+                {
+                    Console.WriteLine($"[CreatePoi] Processing image: {imageFile.FileName} ({imageFile.Length} bytes)");
+                    var (savedImageUrl, _) = await _mediaService.SaveMediaAsync(imageFile, null);
+                    imageUrl = savedImageUrl;
+                    Console.WriteLine($"[CreatePoi] Image saved as: {imageUrl}");
+                }
+                else
+                {
+                    Console.WriteLine("[CreatePoi] No image file provided");
+                }
+
+                // Tạo CreatePoiDto với ImageUrl
+                var poiDto = new CreatePoiDto
+                {
+                    Name = name,
+                    Latitude = latitude,
+                    Longitude = longitude,
+                    Title = title,
+                    Description = description,
+                    ImageUrl = imageUrl
+                };
+
+                Console.WriteLine($"[CreatePoi] CreatePoiDto prepared with ImageUrl={poiDto.ImageUrl}");
+
+                var newPoi = await _poiService.CreateOwnerPoiAsync(ownerId, poiDto);
+
+                Console.WriteLine($"[CreatePoi] POI created: Id={newPoi.Id}, ImageUrl={newPoi.ImageUrl}");
+
+                return CreatedAtAction(nameof(CreatePoi), new { id = newPoi.Id }, new { Message = "Đã tạo quán ăn thành công! Chờ Admin duyệt.", Id = newPoi.Id, ImageUrl = imageUrl });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -154,10 +196,10 @@ namespace VinhKhanhFoodTour.API.Controllers
             }
         }
 
-        // API: Chủ quán cập nhật quán ăn của mình (Owner only)
+        // API: Chủ quán cập nhật quán ăn của mình (Owner only) - Hỗ trợ [FromForm] để upload ảnh
         [HttpPut("owner/{id}")]
-        [Authorize(Roles = "Owner")]
-        public async Task<IActionResult> UpdatePoi(int id, [FromBody] UpdatePoiDto request)
+        [Authorize(Roles = "Owner,Admin")]
+        public async Task<IActionResult> UpdatePoi(int id, [FromForm] UpdatePoiFormRequest request)
         {
             try
             {
@@ -168,7 +210,14 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng." });
                 }
 
-                var poi = await _poiService.UpdatePoiAsync(id, currentUserId, request);
+                string? imageUrl = null;
+                if (request.ImageFile != null && request.ImageFile.Length > 0)
+                {
+                    var (savedImageUrl, _) = await _mediaService.SaveMediaAsync(request.ImageFile, null);
+                    imageUrl = savedImageUrl;
+                }
+
+                var poi = await _poiService.UpdatePoiAsync(id, currentUserId, request, imageUrl);
 
                 return Ok(new { Message = "Đã cập nhật quán ăn thành công! Chờ Admin duyệt lại.", Id = poi.Id });
             }
@@ -183,6 +232,91 @@ namespace VinhKhanhFoodTour.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Message = "Lỗi khi cập nhật quán: " + ex.Message });
+            }
+        }
+
+        // API: Xóa một quán ăn (Owner/Admin)
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Owner,Admin")]
+        public async Task<IActionResult> DeletePoi(int id)
+        {
+            try
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
+                {
+                    return Unauthorized(new { Message = "Không thể xác định người dùng." });
+                }
+
+                var isAdmin = User.IsInRole("Admin");
+                await _poiService.DeletePoiAsync(id, userId, isAdmin);
+
+                return Ok(new { Message = "Đã xóa quán ăn và các dữ liệu liên quan thành công!" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi xóa quán: " + ex.Message });
+            }
+        }
+
+        // API: Lấy thông tin POI dành cho Owner editing (không filter Approved)
+        [HttpGet("owner/{id}")]
+        [Authorize(Roles = "Owner,Admin")]
+        public async Task<IActionResult> GetOwnerPoiById(int id)
+        {
+            try
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
+                {
+                    return Unauthorized(new { Message = "Không thể xác định người dùng." });
+                }
+
+                var isAdmin = User.IsInRole("Admin");
+                var poi = await _poiService.GetPoiByIdAsync(id, userId, isAdmin);
+                
+                var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+                var dto = new PoiDto
+                {
+                    Id = poi.Id,
+                    Name = poi.Name,
+                    Latitude = poi.Latitude,
+                    Longitude = poi.Longitude,
+                    ImageUrl = string.IsNullOrEmpty(poi.ImageUrl) ? "" : (poi.ImageUrl.StartsWith("http") ? poi.ImageUrl : baseUrl.TrimEnd('/') + "/" + poi.ImageUrl.TrimStart('/')),
+                    Status = poi.Status,
+                    RejectionReason = poi.RejectionReason,
+                    Translations = poi.Translations.Select(t => new PoiTranslationDto
+                    {
+                        Id = t.Id,
+                        LanguageCode = t.LanguageCode,
+                        Title = t.Title,
+                        Description = t.Description ?? string.Empty
+                    }).ToList()
+                };
+
+                return Ok(dto);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi lấy thông tin quán: " + ex.Message });
             }
         }
 

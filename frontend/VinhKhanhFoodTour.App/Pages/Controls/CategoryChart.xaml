@@ -31,8 +31,8 @@
                     <controls:ChartDataLabelConverter x:Key="ChartDataLabelConverter"/>
                 </chart:SfCircularChart.Resources>
                 <chart:DoughnutSeries 
-                    ItemsSource="{Binding TodoCategoryData}"
-                    PaletteBrushes="{Binding TodoCategoryColors}"
+                    ItemsSource="{Binding CategoryData}"
+                    PaletteBrushes="{Binding CategoryColors}"
                     XBindingPath="Title"
                     YBindingPath="Count"
                     ShowDataLabels="True"

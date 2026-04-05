@@ -74,5 +74,86 @@ namespace VinhKhanhFoodTour.API.Controller
                 return StatusCode(500, new { Message = "An error occurred while updating the database." });
             }
         }
+        // POST: api/v1/Users
+        [HttpPost]
+        public async Task<ActionResult> CreateUser([FromBody] CreateUserRequest request)
+        {
+            // 1. Kiểm tra tồn tại
+            if (await _context.Users.AnyAsync(u => u.Username == request.Username))
+            {
+                return BadRequest(new { Message = "Username đã tồn tại!" });
+            }
+
+            // 2. Tìm Role
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == request.RoleName);
+            if (role == null)
+            {
+                return BadRequest(new { Message = $"Không tìm thấy Role '{request.RoleName}'" });
+            }
+
+            // 3. Tạo User
+            var user = new VinhKhanhFoodTour.Models.User
+            {
+                Username = request.Username,
+                Email = request.Email,
+                PasswordHash = request.Password, // Theo logic hiện tại của hệ thống
+                RoleId = role.Id,
+                IsActive = true,
+                PreferredLanguage = "vi"
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Tạo User thành công!", Id = user.Id });
+        }
+
+        // DELETE: api/v1/Users/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            // 1. Tìm User
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return NotFound(new { Message = "User không tồn tại!" });
+            }
+
+            // 2. 🛡️ Bảo vệ: Admin không được tự xóa chính mình
+            var currentUserIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            
+            if (int.TryParse(currentUserIdClaim, out int currentAdminId) && currentAdminId == id)
+            {
+                return BadRequest(new { Message = "Bạn không thể tự xóa tài khoản Admin đang đăng nhập!" });
+            }
+
+            // 3. Xử lý xóa
+            try
+            {
+                _context.Users.Remove(user);
+                await _context.SaveChangesAsync();
+                return Ok(new { Message = $"Đã xóa thành công User '{user.Username}'." });
+            }
+            catch (DbUpdateException ex)
+            {
+                // Thường do dính Foreign Key (ví dụ Owner đã tạo POI mà DB không để Cascade Delete)
+                return BadRequest(new { 
+                    Message = "Không thể xóa User này do ràng buộc dữ liệu (hệ thống có chứa các quán ăn/dữ liệu liên quan). Hãy chặn (Block) thay vì xóa.",
+                    Detail = ex.InnerException?.Message 
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi hệ thống khi xóa User.", Detail = ex.Message });
+            }
+        }
+    }
+
+    public class CreateUserRequest
+    {
+        public string Username { get; set; } = null!;
+        public string Email { get; set; } = null!;
+        public string Password { get; set; } = null!;
+        public string RoleName { get; set; } = "Owner";
     }
 }

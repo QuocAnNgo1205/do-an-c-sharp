@@ -37,9 +37,9 @@ namespace VinhKhanhFoodTour.API.Controllers
             // 2. Tạo các thông tin (Claims) giấu vào trong Token
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim("sub", user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role.RoleName) // Đính kèm chức vụ (Admin/Owner)
+                new Claim(ClaimTypes.Role, user.Role?.RoleName ?? "Tourist") // Đính kèm chức vụ (Admin/Owner)
             };
 
             // 3. Ký tên và tạo mã Token
@@ -47,8 +47,8 @@ namespace VinhKhanhFoodTour.API.Controllers
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
+                issuer: _configuration["Jwt:Issuer"]!,
+                audience: _configuration["Jwt:Audience"]!,
                 claims: claims,
                 expires: DateTime.UtcNow.AddDays(7), // Token sống được 7 ngày
                 signingCredentials: creds
@@ -77,11 +77,13 @@ namespace VinhKhanhFoodTour.API.Controllers
                 return BadRequest(new { Message = "Email đã tồn tại!" });
             }
 
-            // 2. Tìm Role "Owner" trong DB
-            var ownerRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Owner");
-            if (ownerRole == null)
+            // 2. Xác định Role (Mặc định là Tourist cho Mobile App)
+            string roleToAssign = string.IsNullOrEmpty(request.Role) ? "Tourist" : request.Role;
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == roleToAssign);
+            
+            if (role == null)
             {
-                return StatusCode(500, new { Message = "Lỗi hệ thống: Không tìm thấy Role Owner!" });
+                return BadRequest(new { Message = $"Lỗi hệ thống: Không tìm thấy Role {roleToAssign}!" });
             }
 
             // 3. Tạo User mới
@@ -90,8 +92,9 @@ namespace VinhKhanhFoodTour.API.Controllers
                 Username = request.Username,
                 Email = request.Email,
                 PasswordHash = request.Password, // Lưu trơn theo cơ chế hiện tại
-                RoleId = ownerRole.Id,
-                IsActive = true
+                RoleId = role.Id,
+                IsActive = true,
+                PreferredLanguage = "vi" // Mặc định tiếng Việt
             };
 
             _context.Users.Add(user);
@@ -113,5 +116,6 @@ namespace VinhKhanhFoodTour.API.Controllers
         public string Username { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string Password { get; set; } = null!;
+        public string? Role { get; set; } // "Owner", "Tourist", v.v.
     }
 }

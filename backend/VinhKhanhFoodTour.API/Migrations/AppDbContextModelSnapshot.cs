@@ -184,6 +184,11 @@ namespace VinhKhanhFoodTour.API.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PreferredLanguage")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 

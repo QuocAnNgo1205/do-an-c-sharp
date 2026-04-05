@@ -3,10 +3,12 @@ namespace VinhKhanhFoodTour.API.Services
     public class MediaService : IMediaService
     {
         private readonly IWebHostEnvironment _env;
+        private readonly ILogger<MediaService>? _logger;
 
-        public MediaService(IWebHostEnvironment env)
+        public MediaService(IWebHostEnvironment env, ILogger<MediaService>? logger = null)
         {
             _env = env;
+            _logger = logger;
         }
 
         public async Task<(string? imageUrl, string? audioFilePath)> SaveMediaAsync(IFormFile? imageFile, IFormFile? audioFile)
@@ -24,16 +26,28 @@ namespace VinhKhanhFoodTour.API.Services
                 }
 
                 var uniqueImageFileName = $"{Guid.NewGuid()}{imageExtension}";
-                var imageDirectory = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "uploads", "images");
+                var webRootPath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+                var imageDirectory = Path.Combine(webRootPath, "uploads", "images");
+                
+                // 🔴 MỚI: Đảm bảo thư mục tồn tại
                 Directory.CreateDirectory(imageDirectory);
+                
                 var imagePhysicalPath = Path.Combine(imageDirectory, uniqueImageFileName);
 
-                using (var fileStream = new FileStream(imagePhysicalPath, FileMode.Create))
+                try
                 {
-                    await imageFile.CopyToAsync(fileStream);
+                    using (var fileStream = new FileStream(imagePhysicalPath, FileMode.Create))
+                    {
+                        await imageFile.CopyToAsync(fileStream);
+                    }
+                    imageUrl = $"/uploads/images/{uniqueImageFileName}";
+                    _logger?.LogInformation($"✓ Ảnh lưu thành công: {imageUrl}");
                 }
-
-                imageUrl = $"/uploads/images/{uniqueImageFileName}";
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"❌ Lỗi lưu ảnh: {ex.Message}");
+                    throw new InvalidOperationException($"Lỗi lưu file ảnh: {ex.Message}", ex);
+                }
             }
 
             if (audioFile != null && audioFile.Length > 0)
@@ -46,16 +60,28 @@ namespace VinhKhanhFoodTour.API.Services
                 }
 
                 var uniqueAudioFileName = $"{Guid.NewGuid()}{audioExtension}";
-                var audioDirectory = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "uploads", "audio");
+                var webRootPath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+                var audioDirectory = Path.Combine(webRootPath, "uploads", "audio");
+                
+                // 🔴 MỚI: Đảm bảo thư mục tồn tại
                 Directory.CreateDirectory(audioDirectory);
+                
                 var audioPhysicalPath = Path.Combine(audioDirectory, uniqueAudioFileName);
 
-                using (var fileStream = new FileStream(audioPhysicalPath, FileMode.Create))
+                try
                 {
-                    await audioFile.CopyToAsync(fileStream);
+                    using (var fileStream = new FileStream(audioPhysicalPath, FileMode.Create))
+                    {
+                        await audioFile.CopyToAsync(fileStream);
+                    }
+                    audioFilePath = $"/uploads/audio/{uniqueAudioFileName}";
+                    _logger?.LogInformation($"✓ Âm thanh lưu thành công: {audioFilePath}");
                 }
-
-                audioFilePath = $"/uploads/audio/{uniqueAudioFileName}";
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"❌ Lỗi lưu âm thanh: {ex.Message}");
+                    throw new InvalidOperationException($"Lỗi lưu file âm thanh: {ex.Message}", ex);
+                }
             }
 
             return (imageUrl, audioFilePath);

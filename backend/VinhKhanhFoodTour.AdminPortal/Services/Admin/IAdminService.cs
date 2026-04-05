@@ -24,6 +24,19 @@ public class PoiActionResponseDto
     public int? Id { get; set; }
 }
 
+public class UserActionResponseDto
+{
+    public string Message { get; set; } = string.Empty;
+}
+
+public class CreateUserDto
+{
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string RoleName { get; set; } = "Owner";
+}
+
 /// <summary>
 /// Service interface for admin operations on POIs
 /// </summary>
@@ -53,4 +66,14 @@ public interface IAdminService
     /// Toggle the IsActive status of a user (Admin only)
     /// </summary>
     Task<UserToggleResponseDto> ToggleUserStatusAsync(int id);
+
+    /// <summary>
+    /// Delete a user (Admin only)
+    /// </summary>
+    Task<UserActionResponseDto> DeleteUserAsync(int id);
+
+    /// <summary>
+    /// Add a new user (Admin only)
+    /// </summary>
+    Task<UserActionResponseDto> AddUserAsync(CreateUserDto dto);
 }

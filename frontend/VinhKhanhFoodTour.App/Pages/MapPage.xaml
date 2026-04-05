@@ -6,10 +6,43 @@
              Title="Bản đồ">
 
     <Grid>
+        <!-- Bản đồ nạp pins -->
         <maps:Map x:Name="foodMap" 
                   IsShowingUser="True" 
                   MapType="Street">
         </maps:Map>
+
+        <!-- Floating UI Control Center -->
+        <Border VerticalOptions="End" 
+                HorizontalOptions="Center" 
+                Margin="20,0,20,30"
+                Padding="15,10"
+                StrokeShape="RoundRectangle 20"
+                StrokeThickness="0"
+                BackgroundColor="#C01A1A1A"
+                HeightRequest="70"
+                ZIndex="100">
+            <!-- Glassmorphism effect background -->
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,5" Opacity="0.5" Radius="10" />
+            </Border.Shadow>
+            
+            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="15" VerticalOptions="Center">
+                <Label Grid.Column="0" Text="📍" FontSize="24" VerticalOptions="Center" />
+                
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                    <Label Text="SMART AUDIO GUIDE" FontSize="12" FontAttributes="Bold" TextColor="#FFC107" CharacterSpacing="1" />
+                    <Label Text="Tự động thuyết minh chạy ngầm" FontSize="10" TextColor="#AAAAAA" />
+                </VerticalStackLayout>
+
+                <Switch Grid.Column="2" 
+                        x:Name="autoPlaySwitch"
+                        OnColor="#FFC107" 
+                        ThumbColor="White" 
+                        VerticalOptions="Center"
+                        Toggled="OnAutoPlayToggled" />
+            </Grid>
+        </Border>
     </Grid>
 
 </ContentPage>

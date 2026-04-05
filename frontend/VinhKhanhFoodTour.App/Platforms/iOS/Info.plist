@@ -26,6 +26,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>audio</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Chúng tôi cần quyền vị trí để tự động phát thuyết minh khi bạn tới gần quán ăn.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Để tính năng Tự động thuyết minh hoạt động ngay cả khi tắt màn hình, hãy chọn 'Cho phép khi dùng ứng dụng' và sau đó đổi thành 'Luôn cho phép'.</string>
+
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
 </dict>

@@ -42,38 +42,55 @@
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="models:Poi">
                             <Border Margin="15,0,15,20" StrokeShape="RoundRectangle 20" StrokeThickness="0" BackgroundColor="#1A1A1A">
-
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer 
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:MainPageModel}}, Path=GoToMapCommand}"
-                                        CommandParameter="{Binding .}" />
-                                </Border.GestureRecognizers>
-
                                 <VerticalStackLayout>
-                                    <Image Aspect="AspectFill" HeightRequest="200" HorizontalOptions="Fill" Source="{Binding ImageUrl}" />
+                                    <!-- Phần 1: Click vào ảnh hoặc tên để xem chi tiết -->
+                                    <VerticalStackLayout Spacing="0">
+                                        <VerticalStackLayout.GestureRecognizers>
+                                            <TapGestureRecognizer 
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:MainPageModel}}, Path=GoToDetailCommand}"
+                                                CommandParameter="{Binding .}" />
+                                        </VerticalStackLayout.GestureRecognizers>
 
-                                    <VerticalStackLayout Padding="15" Spacing="8">
-                                        <Label Text="{Binding Name}" FontSize="20" FontAttributes="Bold" TextColor="#FF5722" />
+                                        <Image Aspect="AspectFill" HeightRequest="200" HorizontalOptions="Fill" Source="{Binding ImageUrl}" />
 
-                                        <HorizontalStackLayout Spacing="10">
-                                            <Label Text="📍" TextColor="#FFC107" />
-                                            <Label Text="{Binding DistanceDisplay}" TextColor="#FFC107" FontAttributes="Bold" />
-                                        </HorizontalStackLayout>
+                                        <VerticalStackLayout Padding="15,15,15,5" Spacing="8">
+                                            <Label Text="{Binding Name}" FontSize="20" FontAttributes="Bold" TextColor="#FF5722" />
 
-                                        <Label Text="{Binding Title}" FontSize="14" TextColor="#B0B0B0" MaxLines="2" />
+                                            <HorizontalStackLayout Spacing="10">
+                                                <Label Text="📍" TextColor="#FFC107" />
+                                                <Label Text="{Binding DistanceDisplay}" TextColor="#FFC107" FontAttributes="Bold" />
+                                            </HorizontalStackLayout>
 
-                                        <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10" Margin="0,10,0,0">
-                                            <Button Grid.Column="0" Text="Nghe thuyết minh" 
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:MainPageModel}}, Path=SpeakCommand}"
-                                                    CommandParameter="{Binding .}"
-                                                    BackgroundColor="#2E7D32" TextColor="White" CornerRadius="10" HeightRequest="40" FontSize="11"/>
-                                            <Button Grid.Column="1" Text="■" 
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:MainPageModel}}, Path=StopSpeakCommand}"
-                                                    BackgroundColor="#D32F2F" TextColor="White" WidthRequest="40" CornerRadius="10" />
-                                            <Button Grid.Column="2" Text="Chi tiết" 
+                                            <Label Text="{Binding Title}" FontSize="14" TextColor="#B0B0B0" MaxLines="2" />
+                                        </VerticalStackLayout>
+                                    </VerticalStackLayout>
+
+                                    <!-- Phần 2: Các nút bấm (Nằm ngoài vùng Gesture để tránh xung đột) -->
+                                    <VerticalStackLayout Padding="15,0,15,15">
+                                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10" Margin="0,10,0,0">
+                                            <Grid Grid.Column="0">
+                                                <Button Text="🔊 Nghe thuyết minh" 
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:MainPageModel}}, Path=SpeakCommand}"
+                                                        CommandParameter="{Binding .}"
+                                                        BackgroundColor="#2E7D32" TextColor="White" CornerRadius="10" HeightRequest="40" FontSize="12">
+                                                    <Button.Triggers>
+                                                        <DataTrigger TargetType="Button" Binding="{Binding IsPlaying}" Value="True">
+                                                            <Setter Property="Text" Value="⏹️ Dừng phát" />
+                                                            <Setter Property="BackgroundColor" Value="#D32F2F" />
+                                                        </DataTrigger>
+                                                    </Button.Triggers>
+                                                </Button>
+
+                                                <ActivityIndicator IsVisible="{Binding IsLoadingAudio}"
+                                                                   IsRunning="{Binding IsLoadingAudio}"
+                                                                   Color="White" HorizontalOptions="Center" VerticalOptions="Center" 
+                                                                   HeightRequest="25" WidthRequest="25" />
+                                            </Grid>
+
+                                            <Button Grid.Column="1" Text="Chi tiết" 
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type pageModels:MainPageModel}}, Path=GoToDetailCommand}"
                                                     CommandParameter="{Binding .}"
-                                                    BackgroundColor="White" TextColor="Black" CornerRadius="10" HeightRequest="40" Padding="10,0"/>
+                                                    BackgroundColor="White" TextColor="Black" CornerRadius="10" HeightRequest="40" Padding="15,0"/>
                                         </Grid>
                                     </VerticalStackLayout>
                                 </VerticalStackLayout>

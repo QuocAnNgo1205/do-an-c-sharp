@@ -11,6 +11,9 @@ namespace VinhKhanhFoodTour.API.Services
         Task<Poi> RejectPoiAsync(int id, string reason);
         Task<Poi> CreateOwnerPoiAsync(int ownerId, CreatePoiDto request);
         Task<Poi> UpdatePoiAsync(int id, int ownerId, UpdatePoiDto request);
+        Task<Poi> UpdatePoiAsync(int id, int ownerId, UpdatePoiFormRequest request, string? imageUrl);
+        Task DeletePoiAsync(int id, int userId, bool isAdmin);
+        Task<Poi> GetPoiByIdAsync(int id, int userId, bool isAdmin);
         Task<List<PoiDto>> GetOwnerPoisAsync(int ownerId);
         Task<List<PoiDto>> GetPublicPoisAsync();
         Task<PoiDetailDto> GetPublicPoiByIdAsync(int id);

@@ -89,6 +89,34 @@ public class AdminService : IAdminService
             throw;
         }
     }
+
+    public async Task<UserActionResponseDto> DeleteUserAsync(int id)
+    {
+        try
+        {
+            var result = await _apiClient.DeleteAsync<UserActionResponseDto>($"api/v1/Users/{id}");
+            return result ?? new UserActionResponseDto { Message = "User deleted successfully." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error deleting user {id}: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<UserActionResponseDto> AddUserAsync(CreateUserDto dto)
+    {
+        try
+        {
+            var result = await _apiClient.PostAsync<UserActionResponseDto>("api/v1/Users", dto);
+            return result ?? new UserActionResponseDto { Message = "User added successfully." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error adding user: {ex.Message}");
+            throw;
+        }
+    }
 }
 
 /// <summary>

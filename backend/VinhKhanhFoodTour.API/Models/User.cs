@@ -24,6 +24,10 @@ namespace VinhKhanhFoodTour.Models
 
         public bool IsActive { get; set; } = true;
 
+        [Required]
+        [MaxLength(10)]
+        public string PreferredLanguage { get; set; } = "vi";
+
         // Navigation Properties
         [ForeignKey("RoleId")]
         public virtual Role? Role { get; set; }

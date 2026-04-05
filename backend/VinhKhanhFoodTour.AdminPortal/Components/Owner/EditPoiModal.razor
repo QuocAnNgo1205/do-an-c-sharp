@@ -1,0 +1,256 @@
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@using Microsoft.AspNetCore.Components.Forms
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (IsOpen)
+{
+<div class="modal-overlay" @onclick="HandleBackdropClick">
+    <div class="modal-content" @onclick:stopPropagation="true">
+        <!-- Header -->
+        <div class="modal-header">
+            <div>
+                <h2 class="modal-title">✏️ Chỉnh sửa quán ăn #@PoiId</h2>
+                <p class="modal-subtitle">Cập nhật thông tin và hình ảnh quán ăn của bạn</p>
+            </div>
+            <button @onclick="Close" class="close-btn" title="Đóng">✕</button>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body">
+            @if (IsInitialLoading)
+            {
+                <div class="flex flex-col items-center justify-center py-12">
+                    <span class="spinner text-4xl">⏳</span>
+                    <p class="mt-4 text-gray-600">Đang tải dữ liệu quán ăn...</p>
+                </div>
+            }
+            else
+            {
+                <div class="form-section">
+                    <div class="form-group">
+                        <label class="form-label">Tên quán ăn <span class="required">*</span></label>
+                        <input type="text"
+                               @bind="FormData.Name"
+                               class="input-field"
+                               placeholder="VD: Bún bò Huế Bà Tuyết" />
+                    </div>
+
+                    <div class="form-group mt-2">
+                        <label class="form-label">Vị trí trên bản đồ <span class="required">*</span></label>
+                        <div id="edit-poi-map" style="height: 250px; width: 100%; border-radius: 0.5rem; z-index: 10;"></div>
+                        <p class="text-xs text-gray-500 mt-1">Kéo thả Marker để thay đổi vị trí</p>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Vĩ độ</label>
+                            <input type="number" @bind="FormData.Latitude" step="0.000001" class="input-field bg-gray-100" readonly />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Kinh độ</label>
+                            <input type="number" @bind="FormData.Longitude" step="0.000001" class="input-field bg-gray-100" readonly />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Tiêu đề (Tiếng Việt) <span class="required">*</span></label>
+                        <input type="text" @bind="FormData.Title" class="input-field" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Mô tả <span class="required">*</span></label>
+                        <textarea @bind="FormData.Description" class="input-field textarea" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">🖼️ Hình ảnh đại diện (JPG/PNG)</label>
+                        <div class="flex items-center gap-4">
+                            @if (!string.IsNullOrEmpty(ExistingImageUrl))
+                            {
+                                <div class="relative">
+                                    <img src="@ExistingImageUrl" class="w-20 h-20 object-cover rounded border" alt="Thumbnail" />
+                                    <span class="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] px-1 rounded">Hiện tại</span>
+                                </div>
+                            }
+                            <div class="file-upload-area flex-1">
+                                <InputFile OnChange="HandleMainImageSelected" accept=".jpg,.jpeg,.png" class="file-input" id="edit-main-image" />
+                                <label for="edit-main-image" class="file-label">
+                                    @if (MainImageFileName != null)
+                                    {
+                                        <span class="file-selected">✅ @MainImageFileName</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="file-placeholder">Chọn ảnh mới để thay thế...</span>
+                                    }
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Footer -->
+        <div class="modal-footer">
+            <button @onclick="Close" class="btn btn-secondary" disabled="@IsSaving">Hủy</button>
+            <button @onclick="HandleUpdatePoi"
+                    disabled="@(IsSaving || IsInitialLoading || !IsFormValid())"
+                    class="btn btn-primary min-w-[120px]">
+                @if (IsSaving)
+                {
+                    <span class="spinner"></span>
+                    <span>Đang lưu...</span>
+                }
+                else
+                {
+                    <span>💾 Lưu thay đổi</span>
+                }
+            </button>
+        </div>
+    </div>
+</div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public int PoiId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnSuccess { get; set; }
+    [Parameter] public Notifications? ParentNotifications { get; set; }
+
+    [Inject] private IPoiService? PoiService { get; set; }
+
+    private CreatePoiDto FormData = new();
+    private string? ExistingImageUrl;
+    private IBrowserFile? MainImageFile = null;
+    private string? MainImageFileName = null;
+    private bool IsInitialLoading = true;
+    private bool IsSaving = false;
+    private DotNetObjectReference<EditPoiModal>? _dotNetRef;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && PoiId > 0 && IsInitialLoading)
+        {
+            await LoadPoiData();
+        }
+    }
+
+    private async Task LoadPoiData()
+    {
+        if (PoiService == null) return;
+        
+        try
+        {
+            IsInitialLoading = true;
+            var poi = await PoiService.GetOwnerPoiByIdAsync(PoiId);
+            if (poi != null)
+            {
+                FormData = new CreatePoiDto
+                {
+                    Name = poi.Name,
+                    Latitude = poi.Latitude,
+                    Longitude = poi.Longitude,
+                    Title = poi.Translations.FirstOrDefault(t => t.Language == "vi")?.Title ?? "",
+                    Description = poi.Translations.FirstOrDefault(t => t.Language == "vi")?.Description ?? ""
+                };
+                ExistingImageUrl = poi.ImageUrl;
+            }
+        }
+        catch (Exception ex)
+        {
+            ParentNotifications?.ShowNotification("Lỗi", $"Không thể tải dữ liệu: {ex.Message}", Notifications.NotificationType.Error);
+        }
+        finally
+        {
+            IsInitialLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (IsOpen && !IsInitialLoading)
+        {
+            try
+            {
+                _dotNetRef ??= DotNetObjectReference.Create(this);
+                // Đợi một chút để element render xong
+                await Task.Delay(100); 
+                await JS.InvokeVoidAsync("window.leafletMapInterop.initMap", "edit-poi-map", _dotNetRef, FormData.Latitude, FormData.Longitude);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"JS Error: {ex.Message}");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void UpdateCoordinates(double lat, double lng)
+    {
+        FormData.Latitude = lat;
+        FormData.Longitude = lng;
+        StateHasChanged();
+    }
+
+    private void HandleMainImageSelected(InputFileChangeEventArgs e)
+    {
+        MainImageFile = e.File;
+        MainImageFileName = e.File.Name;
+    }
+
+    private bool IsFormValid() => !string.IsNullOrWhiteSpace(FormData.Name) && !string.IsNullOrWhiteSpace(FormData.Title);
+
+    private async Task HandleUpdatePoi()
+    {
+        if (PoiService == null) return;
+
+        try
+        {
+            IsSaving = true;
+            Stream? stream = null;
+            if (MainImageFile != null)
+            {
+                stream = MainImageFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            }
+
+            var success = await PoiService.UpdatePoiWithImageAsync(PoiId, FormData, stream, MainImageFileName);
+            
+            if (success)
+            {
+                ParentNotifications?.ShowNotification("Thành công", "Đã cập nhật quán ăn. Chờ Admin duyệt lại nhé!", Notifications.NotificationType.Success);
+                await OnSuccess.InvokeAsync();
+            }
+            else
+            {
+                ParentNotifications?.ShowNotification("Lỗi", "Cập nhật thất bại.", Notifications.NotificationType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ParentNotifications?.ShowNotification("Lỗi", $"Lỗi hệ thống: {ex.Message}", Notifications.NotificationType.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private async Task HandleBackdropClick() { if (!IsSaving) await Close(); }
+
+    public async Task Close()
+    {
+        try { await JS.InvokeVoidAsync("window.leafletMapInterop.destroyMap"); } catch { }
+        IsInitialLoading = true;
+        await OnClose.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        try { await JS.InvokeVoidAsync("window.leafletMapInterop.destroyMap"); } catch { }
+    }
+}

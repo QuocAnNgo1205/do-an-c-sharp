@@ -15,6 +15,11 @@ public interface IPoiService
     Task<CreatePoiResponseDto> CreatePoiAsync(CreatePoiDto dto);
 
     /// <summary>
+    /// Create a new POI with image upload in one request
+    /// </summary>
+    Task<CreatePoiResponseDto> CreatePoiWithImageAsync(CreatePoiDto dto, Stream? imageStream, string? imageName);
+
+    /// <summary>
     /// Upload media (audio/image) for a POI translation
     /// </summary>
     Task<MediaUploadResponseDto> UploadMediaAsync(int poiId, string languageCode, MultipartFormDataContent content);
@@ -28,6 +33,21 @@ public interface IPoiService
     /// Get public POI details by ID
     /// </summary>
     Task<PoiDetailDto?> GetPoiByIdAsync(int id);
+
+    /// <summary>
+    /// Update an existing POI with optional image upload
+    /// </summary>
+    Task<bool> UpdatePoiWithImageAsync(int id, CreatePoiDto dto, Stream? imageStream, string? imageName);
+
+    /// <summary>
+    /// Delete a POI and its associated data
+    /// </summary>
+    Task<bool> DeletePoiAsync(int id);
+
+    /// <summary>
+    /// Get POI by ID with owner status (not filtered by Approved)
+    /// </summary>
+    Task<PoiDto?> GetOwnerPoiByIdAsync(int id);
 }
 
 public class PoiDto
@@ -38,6 +58,7 @@ public class PoiDto
     public double Longitude { get; set; }
     public int TriggerRadius { get; set; }
     public int Status { get; set; }
+    public string? RejectionReason { get; set; }
     public DateTime? CreatedAt { get; set; }
     public string? ImageUrl { get; set; }
     public List<PoiTranslationDto> Translations { get; set; } = [];

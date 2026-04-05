@@ -9,6 +9,7 @@ using System.Security.Claims;
 using System.Text;
 using NetTopologySuite.Geometries;
 using VinhKhanhFoodTour.API.Services;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,10 +23,16 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options => {
+    options.AddPolicy("AllowAll", policy => {
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+    });
+});
 builder.Services.AddScoped<ISyncService, SyncService>();
 builder.Services.AddScoped<ISyncOrchestrator, SyncOrchestrator>();
 builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IPoiService, PoiService>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -166,7 +173,38 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.UseStaticFiles();
+// 🔴 MỚI: Tạo thư mục wwwroot/uploads nếu chưa tồn tại (để lưu ảnh/âm thanh)
+try
+{
+    var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+    var imagesPath = Path.Combine(uploadsPath, "images");
+    var audioPath = Path.Combine(uploadsPath, "audio");
+
+    if (!Directory.Exists(imagesPath))
+    {
+        Directory.CreateDirectory(imagesPath);
+        Console.WriteLine($"✓ Tạo thư mục images: {imagesPath}");
+    }
+
+    if (!Directory.Exists(audioPath))
+    {
+        Directory.CreateDirectory(audioPath);
+        Console.WriteLine($"✓ Tạo thư mục audio: {audioPath}");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[LỖI TẠO THƯ MỤC]: {ex.Message}");
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
+    RequestPath = ""
+});
+
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();

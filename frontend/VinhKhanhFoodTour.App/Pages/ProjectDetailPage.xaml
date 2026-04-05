@@ -55,14 +55,30 @@
                                 CornerRadius="12" 
                                 HeightRequest="55" />
 
-                        <Button Grid.Column="1" 
-                                Text="🔊 THUYẾT MINH"
-                                Command="{Binding SpeakCommand}"
-                                BackgroundColor="#FFC107" 
-                                TextColor="#121212" 
-                                FontAttributes="Bold" 
-                                CornerRadius="12" 
-                                HeightRequest="55" />
+                        <Grid Grid.Column="1">
+                            <Button Text="🔊 THUYẾT MINH"
+                                    Command="{Binding ToggleAudioCommand}"
+                                    BackgroundColor="#FFC107" 
+                                    TextColor="#121212" 
+                                    FontAttributes="Bold" 
+                                    CornerRadius="12" 
+                                    HeightRequest="55">
+                                <Button.Triggers>
+                                    <DataTrigger TargetType="Button" Binding="{Binding IsPlaying}" Value="True">
+                                        <Setter Property="Text" Value="⏹️ DỪNG PHÁT" />
+                                        <Setter Property="BackgroundColor" Value="#F44336" />
+                                        <Setter Property="TextColor" Value="White" />
+                                    </DataTrigger>
+                                </Button.Triggers>
+                            </Button>
+                            
+                            <ActivityIndicator IsVisible="{Binding IsLoadingAudio}"
+                                               IsRunning="{Binding IsLoadingAudio}"
+                                               Color="#121212"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center"
+                                               HeightRequest="30" WidthRequest="30" />
+                        </Grid>
                     </Grid>
 
                     <BoxView HeightRequest="1" Color="#333333" Margin="0,5" />

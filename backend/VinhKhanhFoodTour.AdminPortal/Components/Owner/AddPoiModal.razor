@@ -90,6 +90,33 @@
                                   placeholder="Mô tả ngắn về quán ăn của bạn..."></textarea>
                     </div>
 
+                    <!-- 🟢 FIX #2: Hình ảnh đại diện của quán (Step 1) -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            🖼️ Hình ảnh đại diện của quán (JPG/PNG) <span class="required">*</span>
+                        </label>
+                        <div class="file-upload-area">
+                            <InputFile OnChange="HandleMainImageSelected"
+                                       accept=".jpg,.jpeg,.png"
+                                       class="file-input"
+                                       id="main-image" />
+                            <label for="main-image" class="file-label">
+                                @if (MainImageFileName != null)
+                                {
+                                    <span class="file-selected">✅ @MainImageFileName</span>
+                                }
+                                else
+                                {
+                                    <span class="file-placeholder">
+                                        <span class="upload-icon">📁</span>
+                                        Chọn file ảnh đại diện...
+                                    </span>
+                                }
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Ảnh này sẽ được hiển thị khi người dùng xem thông tin quán</p>
+                    </div>
+
                     <p class="hint-text">
                         <span class="required">*</span> Các trường bắt buộc
                     </p>
@@ -182,32 +209,6 @@
                                         </label>
                                     </div>
                                 </div>
-
-                                <!-- Image upload -->
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        🖼️ Hình ảnh quán (JPG/PNG)
-                                    </label>
-                                    <div class="file-upload-area">
-                                        <InputFile OnChange="(e) => HandleImageSelected(e, index)"
-                                                   accept=".jpg,.jpeg,.png"
-                                                   class="file-input"
-                                                   id="@($"image-{index}")" />
-                                        <label for="@($"image-{index}")" class="file-label">
-                                            @if (translation.ImageFileName != null)
-                                            {
-                                                <span class="file-selected">✅ @translation.ImageFileName</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="file-placeholder">
-                                                    <span class="upload-icon">📁</span>
-                                                    Chọn file ảnh...
-                                                </span>
-                                            }
-                                        </label>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     }
@@ -282,7 +283,6 @@
     public EventCallback OnSuccess { get; set; }
 
     private DotNetObjectReference<AddPoiModal>? _dotNetRef;
-    private bool _mapInitialized = false;
 
     [Inject]
     private IPoiService? PoiService { get; set; }
@@ -292,6 +292,8 @@
 
     // Step 1: POI creation
     private CreatePoiDto FormData = new();
+    private IBrowserFile? MainImageFile = null;
+    private string? MainImageFileName = null;
     private bool IsLoading = false;
     private bool HasCreatedPoi = false;
     private int NewPoiId = 0;
@@ -341,7 +343,6 @@
             {
                 _dotNetRef ??= DotNetObjectReference.Create(this);
                 await JS.InvokeVoidAsync("window.leafletMapInterop.initMap", "poi-map", _dotNetRef, FormData.Latitude, FormData.Longitude);
-                _mapInitialized = true;
             }
             catch (Exception ex)
             {
@@ -371,7 +372,8 @@
                !string.IsNullOrWhiteSpace(FormData.Title) &&
                !string.IsNullOrWhiteSpace(FormData.Description) &&
                FormData.Latitude != 0 &&
-               FormData.Longitude != 0;
+               FormData.Longitude != 0 &&
+               MainImageFile != null; // 🟢 Require main image
     }
 
     private bool HasAnyMedia()
@@ -400,6 +402,14 @@
     }
 
     // ── File selection handlers ──
+
+    // 🟢 NEW: Handler for main image upload (Step 1)
+    private void HandleMainImageSelected(InputFileChangeEventArgs e)
+    {
+        MainImageFile = e.File;
+        MainImageFileName = e.File.Name;
+        StateHasChanged();
+    }
 
     private void HandleAudioSelected(InputFileChangeEventArgs e, int index)
     {
@@ -436,7 +446,34 @@
         try
         {
             IsLoading = true;
-            var response = await PoiService.CreatePoiAsync(FormData);
+            
+            // 🟢 FIX #3: Use CreatePoiWithImageAsync to send image with main POI data
+            CreatePoiResponseDto? response = null;
+            
+            if (MainImageFile != null)
+            {
+                // 🔴 BUG FIX: Create memory stream WITHOUT using block to prevent premature disposal
+                var fileStream = MainImageFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+                var memoryStream = new MemoryStream();
+                try
+                {
+                    await fileStream.CopyToAsync(memoryStream);
+                    memoryStream.Position = 0; // Reset position for reading
+                    
+                    response = await PoiService.CreatePoiWithImageAsync(FormData, memoryStream, MainImageFile.Name);
+                }
+                finally
+                {
+                    // Clean up streams after HTTP request is complete
+                    memoryStream?.Dispose();
+                    fileStream?.Dispose();
+                }
+            }
+            else
+            {
+                // Fallback to JSON (shouldn't happen due to validation)
+                response = await PoiService.CreatePoiAsync(FormData);
+            }
 
             NewPoiId = response.Id;
             HasCreatedPoi = true;
@@ -574,12 +611,12 @@
         await OnSuccess.InvokeAsync();
     }
 
-    private void HandleBackdropClick()
+    private async Task HandleBackdropClick()
     {
         try
         {
             if (IsOpen && !IsLoading)
-                Close();
+                await Close();
         }
         catch (Exception ex)
         {
@@ -598,7 +635,6 @@
             Console.WriteLine($"JS Interop Error (destroyMap): {ex.Message}");
         }
         
-        _mapInitialized = false;
         await Reset();
         await OnClose.InvokeAsync();
     }
@@ -606,6 +642,8 @@
     private async Task Reset()
     {
         FormData = new();
+        MainImageFile = null;  // 🟢 Clear main image
+        MainImageFileName = null;  // 🟢 Clear main image name
         HasCreatedPoi = false;
         NewPoiId = 0;
         Translations = new List<TranslationUploadModel>

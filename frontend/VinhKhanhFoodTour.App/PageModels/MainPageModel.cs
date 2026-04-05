@@ -3,16 +3,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VinhKhanhFoodTour.App.Models;
 using VinhKhanhFoodTour.App.Services;
-using System.Threading; // 👉 Cần cho quản lý dừng giọng nói
 
 namespace VinhKhanhFoodTour.App.PageModels
 {
     public partial class MainPageModel : ObservableObject
     {
         private readonly ApiService _apiService;
-
-        // Biến quản lý dừng thuyết minh (Cách làm của Senior để tránh lỗi pin/memory)
-        private CancellationTokenSource? _speechCancellation;
+        private readonly AudioGuideService _audioGuideService;
 
         [ObservableProperty]
         private ObservableCollection<Poi> restaurants = new();
@@ -21,9 +18,14 @@ namespace VinhKhanhFoodTour.App.PageModels
         [ObservableProperty] private bool isRefreshing;
         [ObservableProperty] private string searchText = string.Empty;
 
-        public MainPageModel(ApiService apiService)
+        // 📊 MỚI: Dữ liệu cho biểu đồ thống kê quán ăn
+        [ObservableProperty] private ObservableCollection<PoiCategory> categoryData = new();
+        [ObservableProperty] private List<Brush> categoryColors = new();
+
+        public MainPageModel(ApiService apiService, AudioGuideService audioGuideService)
         {
             _apiService = apiService;
+            _audioGuideService = audioGuideService;
         }
 
         private async Task LoadDataAsync(string? query = null)
@@ -52,6 +54,9 @@ namespace VinhKhanhFoodTour.App.PageModels
                     }
 
                     _ = UpdateDistancesAsync();
+                    
+                    // Cập nhật biểu đồ sau khi nạp dữ liệu xong
+                    UpdateChartData();
                 }
             }
             catch (Exception) { }
@@ -60,6 +65,30 @@ namespace VinhKhanhFoodTour.App.PageModels
                 IsRefreshing = false;
                 IsBusy = false;
             }
+        }
+
+        private void UpdateChartData()
+        {
+            if (Restaurants == null || Restaurants.Count == 0) return;
+
+            // Ví dụ phân loại theo Title (hoặc bạn có thể dùng Grouping thực tế)
+            var groups = Restaurants
+                .GroupBy(r => (r.Title?.Contains("Cafe") ?? false) ? "Cà phê" :
+                             (r.Title?.Contains("Hải sản") ?? false) ? "Hải sản" :
+                             (r.Title?.Contains("Ốc") ?? false) ? "Ốc & Ăn vặt" : "Khác")
+                .Select(g => new PoiCategory { Title = g.Key, Count = g.Count() })
+                .ToList();
+
+            CategoryData = new ObservableCollection<PoiCategory>(groups);
+
+            // Bảng màu rực rỡ
+            CategoryColors = new List<Brush>
+            {
+                new SolidColorBrush(Color.FromArgb("#FF5722")),
+                new SolidColorBrush(Color.FromArgb("#FFC107")),
+                new SolidColorBrush(Color.FromArgb("#2E7D32")),
+                new SolidColorBrush(Color.FromArgb("#2196F3"))
+            };
         }
 
         private async Task UpdateDistancesAsync()
@@ -80,39 +109,68 @@ namespace VinhKhanhFoodTour.App.PageModels
             catch { }
         }
 
-        // --- TÍNH NĂNG MỚI: THUYẾT MINH ---
+        // --- TÍNH NĂNG MỚI: THUYẾT MINH ĐỒNG BỘ ---
         [RelayCommand]
         private async Task Speak(Poi poi)
         {
-            if (poi == null || string.IsNullOrWhiteSpace(poi.Description)) return;
+            if (poi == null) return;
+
+            // Nếu đang phát chính quán này -> Dừng
+            if (poi.IsPlaying)
+            {
+                await StopSpeak();
+                return;
+            }
+
+            // Dừng mọi quán khác đang phát trước khi phát quán mới
+            await StopSpeak();
 
             try
             {
-                StopSpeak(); // Dừng nếu đang đọc quán cũ
-                _speechCancellation = new CancellationTokenSource();
+                poi.IsLoadingAudio = true;
 
-                await TextToSpeech.Default.SpeakAsync(poi.Description, new SpeechOptions
+                // 🛑 MỚI: Kiểm tra nếu chưa có bản dịch (Translations rỗng), tải chi tiết từ API
+                if (poi.Translations == null || poi.Translations.Count == 0)
                 {
-                    Pitch = 1.0f,
-                    Volume = 1.0f
-                }, _speechCancellation.Token);
+                    var fullPoi = await _apiService.GetPoiDetailAsync(poi.Id);
+                    if (fullPoi?.Translations != null)
+                    {
+                        poi.Translations = fullPoi.Translations;
+                    }
+                }
+                
+                // PlayAudioAsync hiện đã nhận callback để đồng bộ trạng thái UI
+                // Ngôn ngữ được tự động lấy từ Preferences bên trong Service
+                await _audioGuideService.PlayAudioAsync(poi, isPlaying => 
+                {
+                    poi.IsPlaying = isPlaying;
+                    if (!isPlaying) poi.IsLoadingAudio = false;
+                });
             }
-            catch (OperationCanceledException) { }
-            catch (Exception) { }
+            catch (Exception)
+            {
+                // Lỗi đã được Service hiển thị Alert
+            }
+            finally
+            {
+                poi.IsLoadingAudio = false;
+            }
         }
 
         [RelayCommand]
-        private void StopSpeak()
+        private async Task StopSpeak()
         {
-            if (_speechCancellation != null && !_speechCancellation.IsCancellationRequested)
+            await _audioGuideService.StopAudioAsync();
+            
+            // Reset trạng thái hiển thị cho tất cả các quán trong danh sách
+            foreach (var r in Restaurants)
             {
-                _speechCancellation.Cancel();
-                _speechCancellation.Dispose();
-                _speechCancellation = null;
+                r.IsPlaying = false;
+                r.IsLoadingAudio = false;
             }
         }
 
-        // --- GIỮ NGUYÊN TOÀN BỘ CÁC LỆNH GỐC CỦA BẠN ---
+        // --- GIỮ NGUYÊN TOÀN BỘ CÁC LỆNH GỐC ---
         [RelayCommand]
         private async Task Appearing() => await LoadDataAsync();
 

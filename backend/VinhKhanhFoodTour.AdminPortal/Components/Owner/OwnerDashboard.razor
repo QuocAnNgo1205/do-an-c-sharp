@@ -97,7 +97,15 @@
                                     <div class="flex gap-2">
                                         <button class="text-blue-600 hover:text-blue-800 text-sm font-medium" 
                                                 @onclick="() => ViewPoiDetails(poi)">
-                                            View
+                                            🔍 View
+                                        </button>
+                                        <button class="text-yellow-600 hover:text-yellow-800 text-sm font-medium" 
+                                                @onclick="() => EditPoi(poi)">
+                                            ✏️ Edit
+                                        </button>
+                                        <button class="text-red-600 hover:text-red-800 text-sm font-medium" 
+                                                @onclick="() => DeletePoi(poi)">
+                                            🗑️ Delete
                                         </button>
                                     </div>
                                 </td>
@@ -152,6 +160,16 @@
                  ParentNotifications="@NotificationComponent" />
 }
 
+<!-- Edit POI Modal -->
+@if (IsEditModalOpen)
+{
+    <EditPoiModal IsOpen="@IsEditModalOpen"
+                  PoiId="@SelectedPoiId"
+                  OnClose="HandleEditModalClose"
+                  OnSuccess="HandlePoiUpdated"
+                  ParentNotifications="@NotificationComponent" />
+}
+
 @code {
     [Inject]
     private IPoiService? PoiService { get; set; }
@@ -161,9 +179,14 @@
     private List<VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiDto> Pois = new();
     private List<VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiListenStatsDto> ListenStats = new();
     private bool IsModalOpen = false;
+    private bool IsEditModalOpen = false;
+    private int SelectedPoiId = 0;
     private bool IsLoading = true;
     private bool IsLoadingStats = true;
     private bool _isInitialized = false;
+
+    [Inject]
+    private IJSRuntime? JS { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -265,6 +288,59 @@
                 Console.WriteLine($"Navigation error: {ex}");
             }
         }
+    }
+
+    private void EditPoi(VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiDto poi)
+    {
+        SelectedPoiId = (int)poi.Id;
+        IsEditModalOpen = true;
+    }
+
+    private async Task DeletePoi(VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiDto poi)
+    {
+        if (JS == null || PoiService == null) return;
+
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Bạn có chắc chắn muốn xóa quán '{poi.Name}' không? Hành động này sẽ xóa vĩnh viễn dữ liệu và các file âm thanh liên quan.");
+        
+        if (confirmed)
+        {
+            try 
+            {
+                IsLoading = true;
+                var success = await PoiService.DeletePoiAsync((int)poi.Id);
+                if (success)
+                {
+                    NotificationComponent?.ShowNotification("Thành công", "Đã xóa quán ăn thành công.", Notifications.NotificationType.Success);
+                    await LoadPoisAsync();
+                }
+                else 
+                {
+                    NotificationComponent?.ShowNotification("Lỗi", "Không thể xóa quán ăn này.", Notifications.NotificationType.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationComponent?.ShowNotification("Lỗi", $"Lỗi hệ thống khi xóa: {ex.Message}", Notifications.NotificationType.Error);
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+    }
+
+    private void HandleEditModalClose()
+    {
+        IsEditModalOpen = false;
+        SelectedPoiId = 0;
+    }
+
+    private async Task HandlePoiUpdated()
+    {
+        IsEditModalOpen = false;
+        SelectedPoiId = 0;
+        await LoadPoisAsync();
+        StateHasChanged();
     }
 
     private string GetStatusBadgeClass(int status) => status switch

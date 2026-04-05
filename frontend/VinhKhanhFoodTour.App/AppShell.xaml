@@ -4,10 +4,20 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:pages="clr-namespace:VinhKhanhFoodTour.App.Pages"
-    Shell.FlyoutBehavior="Disabled"
-    Shell.TabBarBackgroundColor="White"
-    Shell.TabBarTitleColor="#FFC107"
-    Shell.TabBarUnselectedColor="Gray">
+    Shell.FlyoutBehavior="Disabled">
+
+    <Shell.Resources>
+        <Style TargetType="TabBar" ApplyToDerivedTypes="True">
+            <Setter Property="Shell.TabBarBackgroundColor" Value="#121212" />
+            <Setter Property="Shell.TabBarTitleColor" Value="#FFC107" />
+            <Setter Property="Shell.TabBarUnselectedColor" Value="Gray" />
+        </Style>
+    </Shell.Resources>
+
+    <!-- 🔐 LUỒNG AUTH: LoginPage (Ẩn khỏi TabBar) -->
+    <ShellItem Route="LoginPage" FlyoutItemIsVisible="False">
+        <ShellContent ContentTemplate="{DataTemplate pages:LoginPage}" />
+    </ShellItem>
 
     <TabBar>
         <Tab Title="Địa điểm" Icon="icon_list.png">

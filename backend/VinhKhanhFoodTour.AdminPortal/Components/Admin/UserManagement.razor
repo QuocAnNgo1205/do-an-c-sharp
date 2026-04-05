@@ -15,9 +15,14 @@
             <h1 class="text-3xl font-bold text-gray-800">User Management</h1>
             <p class="text-gray-600 mt-1">Manage system accounts, roles, and access.</p>
         </div>
-        <button @onclick="LoadUsersAsync" class="btn btn-secondary" disabled="@IsLoading">
-            🔄 Refresh
-        </button>
+        <div class="flex gap-3">
+            <button @onclick="() => ShowAddModal = true" class="btn btn-approve">
+                ➕ Add New User
+            </button>
+            <button @onclick="LoadUsersAsync" class="btn btn-secondary" disabled="@IsLoading">
+                🔄 Refresh
+            </button>
+        </div>
     </div>
 
     <!-- Users Table -->
@@ -77,7 +82,7 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="@GetRoleBadgeClass(user.RoleName)">
+                                    <span class="@GetRoleBadgeClass(user.RoleName ?? "Tourist")">
                                         @(user.RoleName ?? "Unknown")
                                     </span>
                                 </td>
@@ -111,6 +116,14 @@
                                             <span>🔓 Unblock</span>
                                         }
                                     </button>
+
+                                    <button 
+                                        class="btn btn-reject text-sm ml-2" 
+                                        @onclick="() => ConfirmDeleteUser(user)"
+                                        disabled="@(ProcessingUserId == user.Id)"
+                                        title="Delete this user permanently">
+                                        🗑️ Delete
+                                    </button>
                                 </td>
                             </tr>
                         }
@@ -120,6 +133,84 @@
         </div>
     </div>
 </div>
+
+@if (ShowAddModal)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">Add New User</h3>
+                <button @onclick="() => ShowAddModal = false" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            
+            <EditForm Model="@NewUser" OnValidSubmit="HandleAddUserAsync" class="p-6 space-y-4">
+                <DataAnnotationsValidator />
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <InputText @bind-Value="NewUser.Username" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Enter username" />
+                    <ValidationMessage For="@(() => NewUser.Username)" class="text-red-500 text-xs mt-1" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <InputText @bind-Value="NewUser.Email" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Enter email" />
+                    <ValidationMessage For="@(() => NewUser.Email)" class="text-red-500 text-xs mt-1" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <InputText @bind-Value="NewUser.Password" type="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Enter password" />
+                    <ValidationMessage For="@(() => NewUser.Password)" class="text-red-500 text-xs mt-1" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <InputSelect @bind-Value="NewUser.RoleName" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 outline-none">
+                        <option value="Tourist">Tourist (User App)</option>
+                        <option value="Owner">Owner (Merchant)</option>
+                        <option value="Admin">Administrator</option>
+                    </InputSelect>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t">
+                    <button type="button" @onclick="() => ShowAddModal = false" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-bold" disabled="@IsSubmitting">
+                        @(IsSubmitting ? "Creating..." : "Create User")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (UserToDelete != null)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden anim-pop">
+            <div class="p-6 text-center">
+                <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                    ⚠️
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Confirm Delete</h3>
+                <p class="text-gray-600 mb-6">
+                    Bạn có chắc chắn muốn xóa user <strong>@UserToDelete.Username</strong> không? <br/>
+                    <span class="text-red-500 text-sm italic font-medium">Hành động này không thể hoàn tác!</span>
+                </p>
+                <div class="flex gap-3">
+                    <button @onclick="() => UserToDelete = null" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors">
+                        Hủy
+                    </button>
+                    <button @onclick="HandleDeleteUserAsync" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold">
+                        Đồng ý Xóa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Inject]
@@ -131,6 +222,14 @@
     private bool IsLoading = true;
     private bool _isInitialized = false;
     private int? ProcessingUserId = null;
+
+    // Modal Add State
+    private bool ShowAddModal = false;
+    private bool IsSubmitting = false;
+    private CreateUserDto NewUser = new();
+
+    // Modal Delete State
+    private UserDto? UserToDelete = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -208,6 +307,78 @@
         {
             ProcessingUserId = null;
             await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleAddUserAsync()
+    {
+        if (AdminService == null) return;
+
+        IsSubmitting = true;
+        try
+        {
+            var result = await AdminService.AddUserAsync(NewUser);
+            
+            NotificationComponent?.ShowNotification(
+                "Success",
+                result.Message,
+                Notifications.NotificationType.Success
+            );
+
+            ShowAddModal = false;
+            NewUser = new(); // Reset
+            await LoadUsersAsync(); // Reload list
+        }
+        catch (Exception)
+        {
+            NotificationComponent?.ShowNotification(
+                "Add User Failed",
+                "Username already exists or systemic error.",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private void ConfirmDeleteUser(UserDto user)
+    {
+        UserToDelete = user;
+    }
+
+    private async Task HandleDeleteUserAsync()
+    {
+        if (UserToDelete == null || AdminService == null) return;
+
+        var targetUserId = UserToDelete.Id;
+        UserToDelete = null; // Close modal
+        
+        ProcessingUserId = targetUserId;
+        try
+        {
+            var result = await AdminService.DeleteUserAsync(targetUserId);
+            
+            NotificationComponent?.ShowNotification(
+                "Deleted",
+                result.Message,
+                Notifications.NotificationType.Success
+            );
+
+            await LoadUsersAsync();
+        }
+        catch (Exception)
+        {
+            NotificationComponent?.ShowNotification(
+                "Delete Error",
+                "Không thể xóa user này (có thể do dính quán ăn/POI hoặc là chính bạn).",
+                Notifications.NotificationType.Error
+            );
+        }
+        finally
+        {
+            ProcessingUserId = null;
         }
     }
 

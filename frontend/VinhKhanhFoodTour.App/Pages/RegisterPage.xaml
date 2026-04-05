@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:VinhKhanhFoodTour.App.PageModels"
+             x:Class="VinhKhanhFoodTour.App.Pages.RegisterPage"
+             x:DataType="pageModels:RegisterViewModel"
+             Title="Đăng ký"
+             BackgroundColor="#0F0F0F">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="25" Padding="30">
+            
+            <VerticalStackLayout Spacing="5" Margin="0,20">
+                <Label Text="Tạo Tài Khoản" FontSize="28" FontAttributes="Bold" TextColor="White" />
+                <Label Text="Tham gia cộng đồng yêu ẩm thực ngay." FontSize="14" TextColor="#B0B0B0" />
+            </VerticalStackLayout>
+
+            <!-- Form -->
+            <VerticalStackLayout Spacing="15">
+                
+                <Label Text="Thông tin cá nhân" FontSize="14" FontAttributes="Bold" TextColor="#FFC107" Margin="0,10,0,0" />
+
+                <Border StrokeShape="RoundRectangle 12" BackgroundColor="#1A1A1A" StrokeThickness="1" Stroke="#333333" Padding="15,0">
+                    <Entry Placeholder="Tên đăng nhập" 
+                           Text="{Binding Username}" 
+                           TextColor="White" 
+                           PlaceholderColor="#555555" 
+                           HeightRequest="50" />
+                </Border>
+
+                <Border StrokeShape="RoundRectangle 12" BackgroundColor="#1A1A1A" StrokeThickness="1" Stroke="#333333" Padding="15,0">
+                    <Entry Placeholder="Địa chỉ Email" 
+                           Text="{Binding Email}" 
+                           Keyboard="Email"
+                           TextColor="White" 
+                           PlaceholderColor="#555555" 
+                           HeightRequest="50" />
+                </Border>
+
+                <Label Text="Bảo mật" FontSize="14" FontAttributes="Bold" TextColor="#FFC107" Margin="0,15,0,0" />
+
+                <Border StrokeShape="RoundRectangle 12" BackgroundColor="#1A1A1A" StrokeThickness="1" Stroke="#333333" Padding="15,0">
+                    <Entry Placeholder="Mật khẩu" 
+                           Text="{Binding Password}" 
+                           IsPassword="True" 
+                           TextColor="White" 
+                           PlaceholderColor="#555555" 
+                           HeightRequest="50" />
+                </Border>
+
+                <Border StrokeShape="RoundRectangle 12" BackgroundColor="#1A1A1A" StrokeThickness="1" Stroke="#333333" Padding="15,0">
+                    <Entry Placeholder="Xác nhận mật khẩu" 
+                           Text="{Binding ConfirmPassword}" 
+                           IsPassword="True" 
+                           TextColor="White" 
+                           PlaceholderColor="#555555" 
+                           HeightRequest="50" />
+                </Border>
+
+            </VerticalStackLayout>
+
+            <!-- Actions -->
+            <VerticalStackLayout Spacing="15" Margin="0,20">
+                <Button Text="ĐĂNG KÝ NGAY" 
+                        Command="{Binding RegisterCommand}" 
+                        BackgroundColor="#FFC107" 
+                        TextColor="#121212" 
+                        FontAttributes="Bold" 
+                        HeightRequest="55" 
+                        CornerRadius="12" />
+
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="5">
+                    <Label Text="Đã có tài khoản?" TextColor="#888888" />
+                    <Label Text="Đăng nhập" TextColor="#FFC107" FontAttributes="Bold">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding GoToLoginCommand}" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" Color="#FFC107" HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

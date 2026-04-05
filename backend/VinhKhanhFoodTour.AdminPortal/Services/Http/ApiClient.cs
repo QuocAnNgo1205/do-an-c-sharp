@@ -102,6 +102,24 @@ public class ApiClient : IDisposable
     }
 
     /// <summary>
+    /// Generic DELETE request
+    /// </summary>
+    public async Task<T?> DeleteAsync<T>(string endpoint)
+    {
+        try
+        {
+            await AttachTokenAsync();
+            var response = await _httpClient.DeleteAsync(endpoint);
+            return await HandleResponseAsync<T>(response);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError($"DELETE {endpoint} failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Generic PUT request with JSON body
     /// </summary>
     public async Task<T?> PutAsync<T>(string endpoint, object body)
@@ -132,7 +150,18 @@ public class ApiClient : IDisposable
         try
         {
             await AttachTokenAsync();
+            
+            // 🔴 DEBUG: Log Content-Type to see if boundary is present
+            _logger.LogInformation($"[PostFormAsync] Sending multipart form to {endpoint}. Content-Type: {content.Headers.ContentType}");
+            
             var response = await _httpClient.PostAsync(endpoint, content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError($"[PostFormAsync] Request to {endpoint} failed with {response.StatusCode}: {responseBody}");
+            }
+            
             return await HandleResponseAsync<T>(response);
         }
         catch (HttpRequestException ex)

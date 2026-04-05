@@ -19,18 +19,18 @@
                 Command="{Binding AppearingCommand}" />
     </ContentPage.Behaviors>
     <Grid>
-        <CollectionView ItemsSource="{Binding Projects}"
+        <CollectionView ItemsSource="{Binding Pois}"
             Margin="{StaticResource LayoutPadding}"
             x:Name="ProjectsCollectionView"
             SelectionMode="Single"
-            SelectedItem="{Binding SelectedProject}"
+            SelectedItem="{Binding SelectedPoi}"
             SelectionChangedCommand="{Binding NavigateToProjectCommand, Source={RelativeSource AncestorType={x:Type pageModels:ProjectListPageModel}}, x:DataType=pageModels:ProjectListPageModel}"
-            SelectionChangedCommandParameter="{Binding SelectedProject}">
+            SelectionChangedCommandParameter="{Binding SelectedPoi}">
             <CollectionView.ItemsLayout>
                 <LinearItemsLayout Orientation="Vertical" ItemSpacing="7.5"/>
             </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:Project">
+                <DataTemplate x:DataType="models:Poi">
                     <Border 
                         Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground},Dark={StaticResource DarkSecondaryBackground}}"
                         SemanticProperties.Description="{Binding Name, StringFormat='{0}'}">
@@ -42,10 +42,5 @@
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
-
-        <controls:AddButton
-        Command="{Binding AddProjectCommand}"
-        SemanticProperties.Description="Add project" 
-        ToolTipProperties.Text="Add project" />
     </Grid>
 </ContentPage>
