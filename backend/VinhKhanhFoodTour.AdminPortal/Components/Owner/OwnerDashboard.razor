@@ -1,5 +1,6 @@
 @using VinhKhanhFoodTour.AdminPortal.Services.Owner
 @using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@inject NavigationManager NavManager
 
 <Notifications @ref="NotificationComponent" />
 
@@ -19,17 +20,17 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="card">
             <div class="text-sm text-gray-600 uppercase tracking-wide">Total Restaurants</div>
-            <div class="text-3xl font-bold text-blue-600 mt-2">@Pois.Count</div>
-            <p class="text-xs text-gray-500 mt-2">@(Pois.Count == 0 ? "No restaurants yet" : "Managed by you")</p>
+            <div class="text-3xl font-bold text-blue-600 mt-2">@(Pois?.Count ?? 0)</div>
+            <p class="text-xs text-gray-500 mt-2">@((Pois?.Count ?? 0) == 0 ? "No restaurants yet" : "Managed by you")</p>
         </div>
         <div class="card">
             <div class="text-sm text-gray-600 uppercase tracking-wide">Approved</div>
-            <div class="text-3xl font-bold text-green-600 mt-2">@Pois.Count(p => p.Status == "Approved")</div>
+            <div class="text-3xl font-bold text-green-600 mt-2">@(Pois?.Count(p => p != null && p.Status == 1) ?? 0)</div>
             <p class="text-xs text-gray-500 mt-2">Ready to access</p>
         </div>
         <div class="card">
             <div class="text-sm text-gray-600 uppercase tracking-wide">Pending</div>
-            <div class="text-3xl font-bold text-yellow-600 mt-2">@Pois.Count(p => p.Status == "Pending")</div>
+            <div class="text-3xl font-bold text-yellow-600 mt-2">@(Pois?.Count(p => p != null && p.Status == 0) ?? 0)</div>
             <p class="text-xs text-gray-500 mt-2">Awaiting approval</p>
         </div>
     </div>
@@ -61,7 +62,7 @@
                             </td>
                         </tr>
                     }
-                    else if (Pois.Count == 0)
+                    else if (Pois == null || Pois.Count == 0)
                     {
                         <tr>
                             <td colspan="5" class="text-center py-8 text-gray-500">
@@ -71,11 +72,11 @@
                     }
                     else
                     {
-                        @foreach (var poi in Pois)
+                        @foreach (var poi in Pois.Where(p => p != null))
                         {
                             <tr>
                                 <td>
-                                    <div class="font-medium text-gray-900">@poi.Name</div>
+                                    <div class="font-medium text-gray-900">@(poi.Name ?? "N/A")</div>
                                 </td>
                                 <td>
                                     <div class="text-sm text-gray-600">
@@ -84,12 +85,12 @@
                                 </td>
                                 <td>
                                     <span class="@GetStatusBadgeClass(poi.Status)">
-                                        @poi.Status
+                                        @GetStatusText(poi.Status)
                                     </span>
                                 </td>
                                 <td>
                                     <div class="text-sm text-gray-600">
-                                        @poi.CreatedAt.ToString("MMM dd, yyyy")
+                                        @(poi.CreatedAt?.ToString("MMM dd, yyyy") ?? "N/A")
                                     </div>
                                 </td>
                                 <td>
@@ -109,7 +110,7 @@
     </div>
 
     <!-- Listen Statistics Section -->
-    @if (ListenStats.Count > 0)
+    @if (ListenStats?.Count > 0)
     {
         <div class="card">
             <div class="card-header">
@@ -117,10 +118,10 @@
             </div>
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    @foreach (var stat in ListenStats)
+                    @foreach (var stat in ListenStats.Where(s => s != null))
                     {
                         <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                            <div class="font-semibold text-gray-800">@stat.PoiName</div>
+                            <div class="font-semibold text-gray-800">@(stat.PoiName ?? "N/A")</div>
                             <div class="text-3xl font-bold text-blue-600 mt-2">@stat.ListenCount</div>
                             <div class="text-xs text-gray-600 mt-1">narration listens</div>
                         </div>
@@ -143,10 +144,13 @@
 </div>
 
 <!-- Add POI Modal -->
-<AddPoiModal IsOpen="@IsModalOpen"
-             OnClose="HandleModalClose"
-             OnSuccess="HandlePoiCreated"
-             ParentNotifications="@NotificationComponent" />
+@if (IsModalOpen)
+{
+    <AddPoiModal IsOpen="@IsModalOpen"
+                 OnClose="HandleModalClose"
+                 OnSuccess="HandlePoiCreated"
+                 ParentNotifications="@NotificationComponent" />
+}
 
 @code {
     [Inject]
@@ -159,31 +163,48 @@
     private bool IsModalOpen = false;
     private bool IsLoading = true;
     private bool IsLoadingStats = true;
+    private bool _isInitialized = false;
 
     protected override async Task OnInitializedAsync()
     {
-        if (PoiService == null)
-        {
-            NotificationComponent?.ShowNotification(
-                "Error",
-                "POI Service not available",
-                Notifications.NotificationType.Error
-            );
-            return;
-        }
+        if (_isInitialized) return;
+        _isInitialized = true;
 
         try
         {
+            if (PoiService == null)
+            {
+                NotificationComponent?.ShowNotification(
+                    "Error",
+                    "POI Service not available",
+                    Notifications.NotificationType.Error
+                );
+                return;
+            }
+
             await LoadPoisAsync();
             await LoadStatisticsAsync();
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Exception in OwnerDashboard OnInitializedAsync: {ex}");
             NotificationComponent?.ShowNotification(
                 "Error",
-                $"Failed to load data: {ex.Message}",
+                $"Failed to load data.",
                 Notifications.NotificationType.Error
             );
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await base.OnAfterRenderAsync(firstRender);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in OwnerDashboard OnAfterRenderAsync: {ex}");
         }
     }
 
@@ -233,18 +254,32 @@
 
     private void ViewPoiDetails(VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiDto poi)
     {
-        NotificationComponent?.ShowNotification(
-            "Info",
-            $"View details for {poi.Name} - Feature coming soon!",
-            Notifications.NotificationType.Info
-        );
+        if (poi != null)
+        {
+            try
+            {
+                NavManager.NavigateTo($"/poi/{poi.Id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Navigation error: {ex}");
+            }
+        }
     }
 
-    private string GetStatusBadgeClass(string status) => status switch
+    private string GetStatusBadgeClass(int status) => status switch
     {
-        "Approved" => "badge badge-success",
-        "Pending" => "badge badge-warning",
-        "Rejected" => "badge badge-error",
+        1 => "badge badge-success",
+        0 => "badge badge-warning",
+        2 => "badge badge-error",
         _ => "badge badge-info"
+    };
+
+    private string GetStatusText(int status) => status switch
+    {
+        1 => "Approved",
+        0 => "Pending",
+        2 => "Rejected",
+        _ => "Unknown"
     };
 }

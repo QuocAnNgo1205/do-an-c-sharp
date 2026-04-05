@@ -166,6 +166,8 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

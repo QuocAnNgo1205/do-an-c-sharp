@@ -1,128 +1,224 @@
 @using VinhKhanhFoodTour.AdminPortal.Services.Owner
 @using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@using Microsoft.AspNetCore.Components.Forms
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
-<div class="@(IsOpen ? "modal-open" : "")" @onclick="HandleBackdropClick">
+@if (IsOpen)
+{
+<div class="modal-overlay" @onclick="HandleBackdropClick">
     <div class="modal-content" @onclick:stopPropagation="true">
         <!-- Header -->
         <div class="modal-header">
-            <h2 class="text-2xl font-bold text-gray-800">
-                @(!HasCreatedPoi ? "Add New Restaurant" : "Upload Media")
-            </h2>
-            <button @onclick="Close" class="text-2xl text-gray-500 hover:text-gray-700">×</button>
+            <div>
+                <h2 class="modal-title">
+                    @(!HasCreatedPoi ? "🍜 Thêm quán ăn mới" : "🎙️ Upload thuyết minh đa ngôn ngữ")
+                </h2>
+                @if (HasCreatedPoi)
+                {
+                    <p class="modal-subtitle">Tải lên file âm thanh và hình ảnh cho từng ngôn ngữ</p>
+                }
+            </div>
+            <button @onclick="Close" class="close-btn" title="Đóng">✕</button>
         </div>
 
         <!-- Body -->
         <div class="modal-body">
             @if (!HasCreatedPoi)
             {
-                <!-- POI Creation Form -->
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Restaurant Name *
-                        </label>
-                        <input type="text" 
-                               @bind="FormData.Name" 
-                               class="input-field"
-                               placeholder="Enter restaurant name" />
+                <!-- Step 1: POI Creation Form -->
+                <div class="form-section">
+                    <!-- Step indicator -->
+                    <div class="step-indicator">
+                        <div class="step active">
+                            <div class="step-circle">1</div>
+                            <span>Thông tin quán</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step">
+                            <div class="step-circle">2</div>
+                            <span>Upload media</span>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">
-                                Latitude *
-                            </label>
-                            <input type="number" 
+                    <div class="form-group">
+                        <label class="form-label">Tên quán ăn <span class="required">*</span></label>
+                        <input type="text"
+                               @bind="FormData.Name"
+                               class="input-field"
+                               placeholder="VD: Bún bò Huế Bà Tuyết" />
+                    </div>
+
+                    <div class="form-group mt-2">
+                        <label class="form-label">Vị trí trên bản đồ <span class="required">*</span></label>
+                        <div id="poi-map" style="height: 300px; width: 100%; border-radius: 0.5rem; z-index: 10;"></div>
+                        <p class="text-xs text-gray-500 mt-1">Kéo thả Marker hoặc click vào bản đồ để chọn tọa độ</p>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Vĩ độ (Latitude)</label>
+                            <input type="number"
                                    @bind="FormData.Latitude"
                                    step="0.000001"
-                                   class="input-field"
-                                   placeholder="E.g., 16.0544" />
+                                   class="input-field bg-gray-100"
+                                   readonly />
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">
-                                Longitude *
-                            </label>
-                            <input type="number" 
+                        <div class="form-group">
+                            <label class="form-label">Kinh độ (Longitude)</label>
+                            <input type="number"
                                    @bind="FormData.Longitude"
                                    step="0.000001"
-                                   class="input-field"
-                                   placeholder="E.g., 107.5793" />
+                                   class="input-field bg-gray-100"
+                                   readonly />
                         </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Title (Vietnamese) *
-                        </label>
-                        <input type="text" 
-                               @bind="FormData.Title" 
+                    <div class="form-group">
+                        <label class="form-label">Tiêu đề (Tiếng Việt) <span class="required">*</span></label>
+                        <input type="text"
+                               @bind="FormData.Title"
                                class="input-field"
-                               placeholder="E.g., Quán bún chả ngon nhất" />
+                               placeholder="VD: Quán bún bò ngon nhất xứ Huế" />
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Description *
-                        </label>
-                        <textarea @bind="FormData.Description" 
-                                  class="input-field"
-                                  rows="4"
-                                  placeholder="Describe your restaurant..."></textarea>
+                    <div class="form-group">
+                        <label class="form-label">Mô tả <span class="required">*</span></label>
+                        <textarea @bind="FormData.Description"
+                                  class="input-field textarea"
+                                  rows="3"
+                                  placeholder="Mô tả ngắn về quán ăn của bạn..."></textarea>
                     </div>
 
-                    <p class="text-sm text-gray-500 italic">
-                        Fields marked with * are required
+                    <p class="hint-text">
+                        <span class="required">*</span> Các trường bắt buộc
                     </p>
                 </div>
             }
             else
             {
-                <!-- Media Upload Form -->
-                <div class="space-y-6 max-w-md mx-auto">
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <p class="text-green-800">
-                            ✅ Restaurant created successfully! ID: <strong>@NewPoiId</strong>
-                        </p>
+                <!-- Step 2: Multilingual Media Upload -->
+                <div class="form-section">
+                    <!-- Step indicator -->
+                    <div class="step-indicator">
+                        <div class="step completed">
+                            <div class="step-circle">✓</div>
+                            <span>Thông tin quán</span>
+                        </div>
+                        <div class="step-line active"></div>
+                        <div class="step active">
+                            <div class="step-circle">2</div>
+                            <span>Upload media</span>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Language Code (e.g., "vi" or "en")
-                        </label>
-                        <input type="text" 
-                               @bind="MediaLanguageCode" 
-                               class="input-field"
-                               placeholder="vi" />
+                    <!-- Success banner -->
+                    <div class="success-banner">
+                        <div class="success-icon">✅</div>
+                        <div>
+                            <strong>Tạo quán thành công!</strong>
+                            <span>ID: #@NewPoiId — Bây giờ bạn có thể upload file thuyết minh (không bắt buộc).</span>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Audio File (MP3)
-                        </label>
-                        <InputFile OnChange="@HandleAudioFileSelected"
-                                   accept=".mp3,audio/mpeg"
-                                   class="input-field" />
-                        @if (AudioFileName != null)
-                        {
-                            <div class="mt-2 text-sm text-green-600">✅ Selected: @AudioFileName</div>
-                        }
-                    </div>
+                    <!-- Translation blocks -->
+                    @for (int i = 0; i < Translations.Count; i++)
+                    {
+                        var index = i;
+                        var translation = Translations[index];
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Image File (JPG/PNG)
-                        </label>
-                        <InputFile OnChange="@HandleImageFileSelected"
-                                   accept=".jpg,.jpeg,.png"
-                                   class="input-field" />
-                        @if (ImageFileName != null)
-                        {
-                            <div class="mt-2 text-sm text-green-600">✅ Selected: @ImageFileName</div>
-                        }
-                    </div>
+                        <div class="translation-block">
+                            <div class="translation-header">
+                                <div class="translation-label">
+                                    <span class="lang-badge">@GetLanguageFlag(translation.LanguageCode)</span>
+                                    <span>Ngôn ngữ #@(index + 1)</span>
+                                </div>
+                                @if (Translations.Count > 1)
+                                {
+                                    <button @onclick="() => RemoveTranslation(index)"
+                                            class="remove-btn"
+                                            title="Xóa ngôn ngữ này">
+                                        🗑️
+                                    </button>
+                                }
+                            </div>
 
-                    <p class="text-sm text-gray-500 italic">
-                        Upload at least one media file (audio or image)
+                            <div class="translation-body">
+                                <!-- Language selector -->
+                                <div class="form-group">
+                                    <label class="form-label">Ngôn ngữ</label>
+                                    <select @bind="translation.LanguageCode" class="input-field select-field">
+                                        <option value="vi">🇻🇳 Tiếng Việt (vi)</option>
+                                        <option value="en">🇬🇧 English (en)</option>
+                                        <option value="ja">🇯🇵 日本語 (ja)</option>
+                                        <option value="ko">🇰🇷 한국어 (ko)</option>
+                                        <option value="zh">🇨🇳 中文 (zh)</option>
+                                        <option value="fr">🇫🇷 Français (fr)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Audio upload -->
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        🎵 File thuyết minh (MP3)
+                                    </label>
+                                    <div class="file-upload-area">
+                                        <InputFile OnChange="(e) => HandleAudioSelected(e, index)"
+                                                   accept=".mp3,audio/mpeg"
+                                                   class="file-input"
+                                                   id="@($"audio-{index}")" />
+                                        <label for="@($"audio-{index}")" class="file-label">
+                                            @if (translation.AudioFileName != null)
+                                            {
+                                                <span class="file-selected">✅ @translation.AudioFileName</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="file-placeholder">
+                                                    <span class="upload-icon">📁</span>
+                                                    Chọn file MP3...
+                                                </span>
+                                            }
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Image upload -->
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        🖼️ Hình ảnh quán (JPG/PNG)
+                                    </label>
+                                    <div class="file-upload-area">
+                                        <InputFile OnChange="(e) => HandleImageSelected(e, index)"
+                                                   accept=".jpg,.jpeg,.png"
+                                                   class="file-input"
+                                                   id="@($"image-{index}")" />
+                                        <label for="@($"image-{index}")" class="file-label">
+                                            @if (translation.ImageFileName != null)
+                                            {
+                                                <span class="file-selected">✅ @translation.ImageFileName</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="file-placeholder">
+                                                    <span class="upload-icon">📁</span>
+                                                    Chọn file ảnh...
+                                                </span>
+                                            }
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Add language button -->
+                    <button @onclick="AddTranslation" class="add-lang-btn">
+                        <span>＋</span> Thêm ngôn ngữ khác
+                    </button>
+
+                    <p class="hint-text">
+                        💡 Bạn có thể bỏ qua bước này và upload file sau.
                     </p>
                 </div>
             }
@@ -132,39 +228,48 @@
         <div class="modal-footer">
             @if (!HasCreatedPoi)
             {
-                <button @onclick="Close" class="btn btn-secondary">Cancel</button>
-                <button @onclick="HandleCreatePoi" 
+                <button @onclick="Close" class="btn btn-secondary">Hủy</button>
+                <button @onclick="HandleCreatePoi"
                         disabled="@(IsLoading || !IsFormValid())"
                         class="btn btn-primary">
                     @if (IsLoading)
                     {
-                        <span>Creating...</span>
+                        <span class="spinner"></span>
+                        <span>Đang tạo...</span>
                     }
                     else
                     {
-                        <span>Create Restaurant</span>
+                        <span>Tạo quán ăn →</span>
                     }
                 </button>
             }
             else
             {
-                <button @onclick="Close" class="btn btn-secondary">Cancel</button>
-                <button @onclick="HandleUploadMedia" 
-                        disabled="@(IsLoading || !IsMediaValid())"
+                <button @onclick="HandleSkip" class="btn btn-secondary" disabled="@IsLoading">
+                    Bỏ qua
+                </button>
+                <button @onclick="HandleUploadMedia"
+                        disabled="@IsLoading"
                         class="btn btn-primary">
                     @if (IsLoading)
                     {
-                        <span>Uploading...</span>
+                        <span class="spinner"></span>
+                        <span>Đang upload... (@UploadProgress/@UploadTotal)</span>
+                    }
+                    else if (HasAnyMedia())
+                    {
+                        <span>📤 Upload & Hoàn tất</span>
                     }
                     else
                     {
-                        <span>Upload Media</span>
+                        <span>✅ Hoàn tất</span>
                     }
                 </button>
             }
         </div>
     </div>
 </div>
+}
 
 @code {
     [Parameter]
@@ -176,24 +281,92 @@
     [Parameter]
     public EventCallback OnSuccess { get; set; }
 
+    private DotNetObjectReference<AddPoiModal>? _dotNetRef;
+    private bool _mapInitialized = false;
+
     [Inject]
     private IPoiService? PoiService { get; set; }
 
     [Parameter]
     public Notifications? ParentNotifications { get; set; }
 
+    // Step 1: POI creation
     private CreatePoiDto FormData = new();
     private bool IsLoading = false;
     private bool HasCreatedPoi = false;
     private int NewPoiId = 0;
-    private string MediaLanguageCode = "vi";
-    private IBrowserFile? AudioFile;
-    private IBrowserFile? ImageFile;
-    private string? AudioFileName;
-    private string? ImageFileName;
+
+    // Step 2: Multilingual media upload
+    private List<TranslationUploadModel> Translations = new();
+    private int UploadProgress = 0;
+    private int UploadTotal = 0;
+
+    /// <summary>
+    /// Model for each language translation upload block
+    /// </summary>
+    private class TranslationUploadModel
+    {
+        public string LanguageCode { get; set; } = "vi";
+        public IBrowserFile? AudioFile { get; set; }
+        public IBrowserFile? ImageFile { get; set; }
+        public string? AudioFileName { get; set; }
+        public string? ImageFileName { get; set; }
+
+        public bool HasFiles => AudioFile != null || ImageFile != null;
+    }
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            FormData ??= new();
+            Translations ??= new();
+            
+            if (Translations.Count == 0)
+            {
+                Translations.Add(new TranslationUploadModel { LanguageCode = "vi" });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in AddPoiModal OnInitialized: {ex}");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !HasCreatedPoi)
+        {
+            try
+            {
+                _dotNetRef ??= DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("window.leafletMapInterop.initMap", "poi-map", _dotNetRef, FormData.Latitude, FormData.Longitude);
+                _mapInitialized = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"JS Interop Error (initMap): {ex.Message}");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void UpdateCoordinates(double lat, double lng)
+    {
+        if (FormData != null)
+        {
+            FormData.Latitude = lat;
+            FormData.Longitude = lng;
+            StateHasChanged();
+        }
+    }
+
+    // ── Form Validation ──
 
     private bool IsFormValid()
     {
+        if (FormData == null) return false;
+        
         return !string.IsNullOrWhiteSpace(FormData.Name) &&
                !string.IsNullOrWhiteSpace(FormData.Title) &&
                !string.IsNullOrWhiteSpace(FormData.Description) &&
@@ -201,37 +374,90 @@
                FormData.Longitude != 0;
     }
 
-    private bool IsMediaValid()
+    private bool HasAnyMedia()
     {
-        return !string.IsNullOrWhiteSpace(MediaLanguageCode) && 
-               (AudioFile != null || ImageFile != null);
+        return Translations.Any(t => t.HasFiles);
     }
 
+    // ── Translation list management ──
+
+    private void AddTranslation()
+    {
+        // Pick next available language
+        var usedCodes = Translations.Select(t => t.LanguageCode).ToHashSet();
+        var nextLang = new[] { "vi", "en", "ja", "ko", "zh", "fr" }
+            .FirstOrDefault(c => !usedCodes.Contains(c)) ?? "en";
+
+        Translations.Add(new TranslationUploadModel { LanguageCode = nextLang });
+    }
+
+    private void RemoveTranslation(int index)
+    {
+        if (Translations.Count > 1 && index >= 0 && index < Translations.Count)
+        {
+            Translations.RemoveAt(index);
+        }
+    }
+
+    // ── File selection handlers ──
+
+    private void HandleAudioSelected(InputFileChangeEventArgs e, int index)
+    {
+        if (index >= 0 && index < Translations.Count)
+        {
+            Translations[index].AudioFile = e.File;
+            Translations[index].AudioFileName = e.File.Name;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleImageSelected(InputFileChangeEventArgs e, int index)
+    {
+        if (index >= 0 && index < Translations.Count)
+        {
+            Translations[index].ImageFile = e.File;
+            Translations[index].ImageFileName = e.File.Name;
+            StateHasChanged();
+        }
+    }
+
+    // ── Step 1: Create POI ──
 
     private async Task HandleCreatePoi()
     {
+        Console.WriteLine(">>> HandleCreatePoi called!");
+
         if (!IsFormValid() || PoiService == null)
+        {
+            Console.WriteLine(">>> HandleCreatePoi: validation failed or PoiService is null.");
             return;
+        }
 
         try
         {
             IsLoading = true;
             var response = await PoiService.CreatePoiAsync(FormData);
-            
+
             NewPoiId = response.Id;
             HasCreatedPoi = true;
 
+            // Ensure at least 1 translation block exists
+            if (Translations.Count == 0)
+            {
+                Translations.Add(new TranslationUploadModel { LanguageCode = "vi" });
+            }
+
             ParentNotifications?.ShowNotification(
-                "Success",
-                "Restaurant created! Now upload media files.",
+                "Thành công",
+                "Đã tạo quán ăn! Bạn có thể upload file thuyết minh bên dưới.",
                 Notifications.NotificationType.Success
             );
         }
         catch (Exception ex)
         {
             ParentNotifications?.ShowNotification(
-                "Error",
-                $"Failed to create restaurant: {ex.Message}",
+                "Lỗi",
+                $"Không thể tạo quán: {ex.Message}",
                 Notifications.NotificationType.Error
             );
         }
@@ -241,35 +467,82 @@
         }
     }
 
+    // ── Step 2: Upload media for all translations ──
+
     private async Task HandleUploadMedia()
     {
-        if (!IsMediaValid() || PoiService == null)
+        if (PoiService == null) return;
+
+        // Get only translations that have files
+        var translationsWithFiles = Translations.Where(t => t.HasFiles).ToList();
+
+        // No files selected → just close and report success
+        if (translationsWithFiles.Count == 0)
+        {
+            ParentNotifications?.ShowNotification(
+                "Hoàn tất",
+                "Đã tạo quán ăn thành công! Bạn có thể upload thuyết minh sau.",
+                Notifications.NotificationType.Success
+            );
+            await Reset();
+            await OnSuccess.InvokeAsync();
             return;
+        }
 
         try
         {
             IsLoading = true;
-            var content = new MultipartFormDataContent();
+            UploadProgress = 0;
+            UploadTotal = translationsWithFiles.Count;
+            int successCount = 0;
+            var errors = new List<string>();
 
-            if (AudioFile != null)
+            foreach (var translation in translationsWithFiles)
             {
-                var audioStream = AudioFile.OpenReadStream();
-                content.Add(new StreamContent(audioStream), "audioFile", AudioFile.Name);
+                UploadProgress++;
+                StateHasChanged();
+
+                try
+                {
+                    var content = new MultipartFormDataContent();
+
+                    if (translation.AudioFile != null)
+                    {
+                        var audioStream = translation.AudioFile.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+                        content.Add(new StreamContent(audioStream), "audioFile", translation.AudioFile.Name);
+                    }
+
+                    if (translation.ImageFile != null)
+                    {
+                        var imageStream = translation.ImageFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                        content.Add(new StreamContent(imageStream), "imageFile", translation.ImageFile.Name);
+                    }
+
+                    await PoiService.UploadMediaAsync(NewPoiId, translation.LanguageCode, content);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"[{translation.LanguageCode}]: {ex.Message}");
+                }
             }
 
-            if (ImageFile != null)
+            if (errors.Count == 0)
             {
-                var imageStream = ImageFile.OpenReadStream();
-                content.Add(new StreamContent(imageStream), "imageFile", ImageFile.Name);
+                ParentNotifications?.ShowNotification(
+                    "Hoàn tất! ✅",
+                    $"Đã upload thuyết minh cho {successCount} ngôn ngữ thành công!",
+                    Notifications.NotificationType.Success
+                );
             }
-
-            await PoiService.UploadMediaAsync(NewPoiId, MediaLanguageCode, content);
-
-            ParentNotifications?.ShowNotification(
-                "Success",
-                "Media uploaded successfully!",
-                Notifications.NotificationType.Success
-            );
+            else
+            {
+                ParentNotifications?.ShowNotification(
+                    "Cảnh báo",
+                    $"Upload {successCount} thành công, {errors.Count} lỗi: {string.Join("; ", errors)}",
+                    Notifications.NotificationType.Warning
+                );
+            }
 
             await Reset();
             await OnSuccess.InvokeAsync();
@@ -277,8 +550,8 @@
         catch (Exception ex)
         {
             ParentNotifications?.ShowNotification(
-                "Error",
-                $"Failed to upload media: {ex.Message}",
+                "Lỗi",
+                $"Lỗi upload media: {ex.Message}",
                 Notifications.NotificationType.Error
             );
         }
@@ -288,26 +561,44 @@
         }
     }
 
-    private void HandleAudioFileSelected(InputFileChangeEventArgs e)
-    {
-        AudioFile = e.File;
-        AudioFileName = e.File.Name;
-    }
+    // ── Skip/Close ──
 
-    private void HandleImageFileSelected(InputFileChangeEventArgs e)
+    private async Task HandleSkip()
     {
-        ImageFile = e.File;
-        ImageFileName = e.File.Name;
+        ParentNotifications?.ShowNotification(
+            "Hoàn tất",
+            "Đã tạo quán ăn thành công! Bạn có thể upload thuyết minh sau.",
+            Notifications.NotificationType.Success
+        );
+        await Reset();
+        await OnSuccess.InvokeAsync();
     }
 
     private void HandleBackdropClick()
     {
-        if (IsOpen)
-            Close();
+        try
+        {
+            if (IsOpen && !IsLoading)
+                Close();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in HandleBackdropClick: {ex}");
+        }
     }
 
     public async Task Close()
     {
+        try
+        {
+            await JS.InvokeVoidAsync("window.leafletMapInterop.destroyMap");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"JS Interop Error (destroyMap): {ex.Message}");
+        }
+        
+        _mapInitialized = false;
         await Reset();
         await OnClose.InvokeAsync();
     }
@@ -317,11 +608,39 @@
         FormData = new();
         HasCreatedPoi = false;
         NewPoiId = 0;
-        MediaLanguageCode = "vi";
-        AudioFile = null;
-        ImageFile = null;
-        AudioFileName = null;
-        ImageFileName = null;
+        Translations = new List<TranslationUploadModel>
+        {
+            new() { LanguageCode = "vi" }
+        };
+        UploadProgress = 0;
+        UploadTotal = 0;
         IsLoading = false;
+    }
+
+    // ── Helpers ──
+
+    private string GetLanguageFlag(string code) => code switch
+    {
+        "vi" => "🇻🇳",
+        "en" => "🇬🇧",
+        "ja" => "🇯🇵",
+        "ko" => "🇰🇷",
+        "zh" => "🇨🇳",
+        "fr" => "🇫🇷",
+        _ => "🌐"
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotNetRef != null)
+        {
+            _dotNetRef.Dispose();
+            _dotNetRef = null;
+        }
+        try
+        {
+            await JS.InvokeVoidAsync("window.leafletMapInterop.destroyMap");
+        }
+        catch { /* ignore in dispose */ }
     }
 }

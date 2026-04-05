@@ -151,6 +151,35 @@ namespace VinhKhanhFoodTour.API.Services
                 .ToListAsync();
         }
 
+        public async Task<PoiDetailDto> GetPublicPoiByIdAsync(int id)
+        {
+            var poi = await _context.Pois
+                .Include(p => p.Translations)
+                .FirstOrDefaultAsync(p => p.Id == id && p.Status == PoiStatus.Approved);
+
+            if (poi == null)
+            {
+                throw new KeyNotFoundException($"Không tìm thấy quán truy cập công khai với ID: {id}");
+            }
+
+            return new PoiDetailDto
+            {
+                Id = poi.Id,
+                Name = poi.Name,
+                Latitude = SpatialHelper.GetLatitude(poi.Location),
+                Longitude = SpatialHelper.GetLongitude(poi.Location),
+                Translations = poi.Translations.Select(t => new PoiDetailTranslationDto
+                {
+                    Id = t.Id,
+                    LanguageCode = t.LanguageCode,
+                    Title = t.Title,
+                    Description = t.Description,
+                    AudioFilePath = t.AudioFilePath,
+                    ImageUrl = t.ImageUrl
+                }).ToList()
+            };
+        }
+
         public async Task<List<MapPinDto>> GetMapPinsAsync()
         {
             return await _context.Pois

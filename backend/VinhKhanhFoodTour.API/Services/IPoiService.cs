@@ -13,6 +13,7 @@ namespace VinhKhanhFoodTour.API.Services
         Task<Poi> UpdatePoiAsync(int id, int ownerId, UpdatePoiDto request);
         Task<List<PoiDto>> GetOwnerPoisAsync(int ownerId);
         Task<List<PoiDto>> GetPublicPoisAsync();
+        Task<PoiDetailDto> GetPublicPoiByIdAsync(int id);
         Task<List<MapPinDto>> GetMapPinsAsync();
         Task<List<PoiDto>> GetNearbyPoisAsync(double userLat, double userLng, double radiusInMeters);
         Task<(Poi poi, PoiTranslation translation)> GetOwnerTranslationAsync(int poiId, string languageCode, int ownerId);

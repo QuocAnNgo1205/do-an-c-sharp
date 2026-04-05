@@ -226,6 +226,26 @@ namespace VinhKhanhFoodTour.API.Controllers
             }
         }
 
+        // API: Lấy thông tin chi tiết một quán ăn công khai (Public)
+        [HttpGet("public/{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPublicPoiById(int id)
+        {
+            try
+            {
+                var poi = await _poiService.GetPublicPoiByIdAsync(id);
+                return Ok(poi);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi lấy thông tin chi tiết quán: " + ex.Message });
+            }
+        }
+
         // API: Lấy danh sách các chân dung quán trên bản đồ (Public - tối ưu cho bản đồ)
         [HttpGet("public/map-pins")]
         [AllowAnonymous]
