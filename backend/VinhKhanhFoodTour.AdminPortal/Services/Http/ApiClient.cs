@@ -172,6 +172,34 @@ public class ApiClient : IDisposable
     }
 
     /// <summary>
+    /// Generic PUT with multipart/form-data (for file updates)
+    /// </summary>
+    public async Task<T?> PutFormAsync<T>(string endpoint, MultipartFormDataContent content)
+    {
+        try
+        {
+            await AttachTokenAsync();
+            
+            _logger.LogInformation($"[PutFormAsync] Sending multipart form to {endpoint}.");
+            
+            var response = await _httpClient.PutAsync(endpoint, content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError($"[PutFormAsync] Request to {endpoint} failed with {response.StatusCode}: {responseBody}");
+            }
+            
+            return await HandleResponseAsync<T>(response);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError($"PUT {endpoint} (form) failed: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Handle HTTP response with 401 interceptor
     /// </summary>
     private async Task<T?> HandleResponseAsync<T>(HttpResponseMessage response)
