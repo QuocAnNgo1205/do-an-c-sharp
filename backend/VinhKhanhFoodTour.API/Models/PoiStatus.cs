@@ -28,6 +28,12 @@ namespace VinhKhanhFoodTour.Models
 
         public double TriggerRadius { get; set; } = 20.0;
 
+        // --- BẮT ĐẦU PHẦN THÊM MỚI ĐỂ HẾT LỖI ---
+        public double Latitude { get; set; }  // Thêm dòng này
+        public double Longitude { get; set; } // Thêm dòng này
+        public string ImageUrl { get; set; } = string.Empty; // Thêm dòng này
+        // --- KẾT THÚC PHẦN THÊM MỚI ---
+
         public PoiStatus Status { get; set; } = PoiStatus.Pending;
         public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

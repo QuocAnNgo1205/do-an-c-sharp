@@ -64,12 +64,22 @@ namespace VinhKhanhFoodTour.API.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETUTCDATE()");
 
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("LastUpdated")
                         .HasColumnType("datetime2");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("float");
 
                     b.Property<Point>("Location")
                         .IsRequired()
                         .HasColumnType("geography");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("float");
 
                     b.Property<string>("Name")
                         .IsRequired()

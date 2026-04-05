@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VinhKhanhFoodTour.App.Pages.ProfilePage"
+             Title="Hồ sơ">
+    <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
+        <Label Text="Thông tin cá nhân" FontSize="24" FontAttributes="Bold" TextColor="Orange"/>
+        <Label Text="Chào mừng bạn đến với Phố Vĩnh Khánh!" />
+    </VerticalStackLayout>
+</ContentPage>

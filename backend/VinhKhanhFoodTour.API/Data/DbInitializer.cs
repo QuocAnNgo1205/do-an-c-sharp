@@ -1,4 +1,6 @@
 using VinhKhanhFoodTour.Models;
+using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries; // Thư viện để dùng kiểu Point
 
 namespace VinhKhanhFoodTour.Data
 {
@@ -6,112 +8,76 @@ namespace VinhKhanhFoodTour.Data
     {
         public static void Initialize(AppDbContext context)
         {
-            // Check if data already exists
-            if (context.Roles.Any()) return;
+            // 1. Kiểm tra nếu đã có dữ liệu POI thì không chạy lại nữa
+            if (context.Pois.Any()) return;
 
-            // Seed Roles
+            // 2. Tạo Role
             var adminRole = new Role { RoleName = "Admin" };
             var ownerRole = new Role { RoleName = "Owner" };
             context.Roles.AddRange(adminRole, ownerRole);
             context.SaveChanges();
 
-            // Seed Users
-            var users = new User[]
-            {
-                new User {
-                    Username = "admin",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
-                    RoleId = adminRole.Id
-                },
-                new User {
-                    Username = "owner1",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
-                    RoleId = ownerRole.Id
-                }
-            };
-            context.Users.AddRange(users);
+            // 3. Tạo User
+            var adminUser = new User { Username = "admin", PasswordHash = "123", RoleId = adminRole.Id };
+            var ownerOanhUser = new User { Username = "owner_oanh", PasswordHash = "123", RoleId = ownerRole.Id };
+            var ownerVuUser = new User { Username = "owner_vu", PasswordHash = "123", RoleId = ownerRole.Id };
+
+            context.Users.AddRange(adminUser, ownerOanhUser, ownerVuUser);
             context.SaveChanges();
 
-            // Seed POIs
-            var ownerOanh = context.Users.FirstOrDefault(u => u.Username == "owner_oanh");
-            var ownerVu = context.Users.FirstOrDefault(u => u.Username == "owner_vu");
-
+            // 4. Tạo POIs (Quán ăn)
             var pois = new Poi[]
             {
                 new Poi
                 {
                     Name = "Ốc Oanh",
                     Status = PoiStatus.Approved,
-                    Location = new NetTopologySuite.Geometries.Point(106.123456, 10.123456) { SRID = 4326 },
+                    // Tọa độ chuẩn cho SQL Server xử lý bản đồ
+                    Location = new Point(106.702081, 10.760193) { SRID = 4326 },
                     TriggerRadius = 20.0,
-                    OwnerId = ownerOanh.Id
+                    OwnerId = ownerOanhUser.Id,
+                    ImageUrl = "https://images.foody.vn/res/g1/476/prof/foody-mobile-oc-oanh-vinh-khanh-avatar-804-63799651234567890.jpg",
+                    Latitude = 10.760193,
+                    Longitude = 106.702081
                 },
                 new Poi
                 {
                     Name = "Ốc Vũ",
                     Status = PoiStatus.Approved,
-                    Location = new NetTopologySuite.Geometries.Point(106.125678, 10.125789) { SRID = 4326 },
+                    Location = new Point(106.703123, 10.761456) { SRID = 4326 },
                     TriggerRadius = 20.0,
-                    OwnerId = ownerVu.Id
+                    OwnerId = ownerVuUser.Id,
+                    ImageUrl = "https://vcdn1-dulich.vnecdn.net/2021/11/24/1-1637745123.jpg",
+                    Latitude = 10.761456,
+                    Longitude = 106.703123
                 }
             };
-            foreach (var poi in pois)
-            {
-                context.Pois.Add(poi);
-            }
+
+            context.Pois.AddRange(pois);
             context.SaveChanges();
 
-            // Seed PoiTranslations
-            var poiOanh = context.Pois.FirstOrDefault(p => p.Name == "Ốc Oanh");
-            var poiVu = context.Pois.FirstOrDefault(p => p.Name == "Ốc Vũ");
-
+            // 5. Tạo Translations (Thuyết minh đa ngôn ngữ)
             var translations = new PoiTranslation[]
             {
-                // Ốc Oanh - Vietnamese
                 new PoiTranslation
                 {
-                    PoiId = poiOanh.Id,
+                    PoiId = pois[0].Id, // Ốc Oanh
                     LanguageCode = "vi",
-                    Title = "Ốc Oanh",
-                    Description = "Nhà hàng ốc nổi tiếng tại quận 4, thành phố Hồ Chí Minh. Phục vụ các món ốc tươi sống với hương vị đặc sắc của vùng sông nước.",
-                    ImageUrl = "https://example.com/oc-oanh-vi.jpg",
-                    AudioFilePath = "/audio/oc-oanh-vi.mp3"
+                    Title = "Ốc Oanh Vinh Khánh",
+                    Description = "Nhà hàng ốc nổi tiếng tại quận 4, thành phố Hồ Chí Minh. Phục vụ các món ốc tươi sống với hương vị đặc sắc.",
+                    ImageUrl = "https://images.foody.vn/res/g1/476/prof/foody-mobile-oc-oanh-vinh-khanh-avatar-804-63799651234567890.jpg"
                 },
-                // Ốc Oanh - English
                 new PoiTranslation
                 {
-                    PoiId = poiOanh.Id,
-                    LanguageCode = "en",
-                    Title = "Ốc Oanh Restaurant",
-                    Description = "A renowned snail restaurant in District 4, Ho Chi Minh City. Serving fresh live snails with distinctive flavors of the Mekong Delta region.",
-                    ImageUrl = "https://example.com/oc-oanh-en.jpg",
-                    AudioFilePath = "/audio/oc-oanh-en.mp3"
-                },
-                // Ốc Vũ - Vietnamese
-                new PoiTranslation
-                {
-                    PoiId = poiVu.Id,
+                    PoiId = pois[1].Id, // Ốc Vũ
                     LanguageCode = "vi",
-                    Title = "Ốc Vũ",
-                    Description = "Quán ốc uy tín tại đường Vinh Khánh, quận 4. Chuyên cung cấp các loại ốc nước ngọt tươi sống với nhiều cách chế biến hấp dẫn.",
-                    ImageUrl = "https://example.com/oc-vu-vi.jpg",
-                    AudioFilePath = "/audio/oc-vu-vi.mp3"
-                },
-                // Ốc Vũ - English
-                new PoiTranslation
-                {
-                    PoiId = poiVu.Id,
-                    LanguageCode = "en",
-                    Title = "Ốc Vũ Restaurant",
-                    Description = "A trusted snail restaurant on Vinh Khanh Street, District 4. Specializing in fresh freshwater snails prepared in various delicious ways.",
-                    ImageUrl = "https://example.com/oc-vu-en.jpg",
-                    AudioFilePath = "/audio/oc-vu-en.mp3"
+                    Title = "Ốc Vũ Vinh Khánh",
+                    Description = "Quán ốc uy tín chuyên các loại ốc tươi sống, không gian thoáng mát tại đường Vinh Khánh.",
+                    ImageUrl = "https://vcdn1-dulich.vnecdn.net/2021/11/24/1-1637745123.jpg"
                 }
             };
-            foreach (var translation in translations)
-            {
-                context.PoiTranslations.Add(translation);
-            }
+
+            context.PoiTranslations.AddRange(translations);
             context.SaveChanges();
         }
     }

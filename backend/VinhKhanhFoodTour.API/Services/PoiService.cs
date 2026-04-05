@@ -24,6 +24,11 @@ namespace VinhKhanhFoodTour.API.Services
                 OwnerId = ownerId,
                 Name = request.Name,
                 Location = location,
+
+                // 👉 ĐÃ THÊM 2 DÒNG NÀY ĐỂ LƯU TỌA ĐỘ VÀO DATABASE
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+
                 Status = PoiStatus.Pending,
                 TriggerRadius = 50,
                 LastUpdated = DateTime.UtcNow,
@@ -82,6 +87,11 @@ namespace VinhKhanhFoodTour.API.Services
                 OwnerId = ownerId,
                 Name = request.Name,
                 Location = location,
+
+                // 👉 ĐÃ THÊM 2 DÒNG NÀY ĐỂ LƯU TỌA ĐỘ VÀO DATABASE
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+
                 Status = PoiStatus.Pending,
                 TriggerRadius = 50,
                 LastUpdated = DateTime.UtcNow,
@@ -111,6 +121,11 @@ namespace VinhKhanhFoodTour.API.Services
 
             poi.Name = request.Name;
             poi.Location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
+
+            // 👉 ĐÃ THÊM 2 DÒNG NÀY ĐỂ CẬP NHẬT LẠI TỌA ĐỘ TRONG DATABASE
+            poi.Latitude = request.Latitude;
+            poi.Longitude = request.Longitude;
+
             poi.Status = PoiStatus.Pending;
             poi.RejectionReason = null;
             poi.LastUpdated = DateTime.UtcNow;
@@ -188,6 +203,7 @@ namespace VinhKhanhFoodTour.API.Services
                 Name = p.Name,
                 Latitude = SpatialHelper.GetLatitude(p.Location),
                 Longitude = SpatialHelper.GetLongitude(p.Location),
+                ImageUrl = p.ImageUrl ?? "",
                 Status = p.Status,
                 RejectionReason = p.RejectionReason,
                 Translations = p.Translations.Select(t => new PoiTranslationDto

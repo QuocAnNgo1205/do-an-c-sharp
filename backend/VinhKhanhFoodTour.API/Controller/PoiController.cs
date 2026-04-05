@@ -10,7 +10,7 @@ namespace VinhKhanhFoodTour.API.Controllers
 {
     [Route("api/v1/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin,Owner")]
+    // TÔI ĐÃ BỎ [Authorize] Ở ĐÂY để App mobile có thể xem danh sách quán mà không cần đăng nhập
     public class PoiController : ControllerBase
     {
         private readonly IPoiService _poiService;
@@ -24,8 +24,31 @@ namespace VinhKhanhFoodTour.API.Controllers
             _syncOrchestrator = syncOrchestrator;
         }
 
+        // ======================================================================
+        // CÁC HÀM TÔI THÊM VÀO ĐỂ SỬA LỖI CHO BẠN
+        // ======================================================================
+
+        // API MỚI 1: Để Mobile App gọi được api/v1/Poi (Sửa lỗi 405 Method Not Allowed)
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetAllPoisForMobile()
+        {
+            try
+            {
+                var approvedPois = await _poiService.GetPublicPoisAsync();
+                return Ok(approvedPois);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi lấy danh sách: " + ex.Message });
+            }
+        }
+
+        // Đã xóa bỏ hàm DeletePoi và dấu gạch chéo '/' bị lỗi ở đây
+
         // API: Thêm một quán ăn mới
         [HttpPost]
+        [Authorize(Roles = "Admin,Owner")]
         public async Task<IActionResult> CreateNewPoi([FromBody] CreatePoiRequest request)
         {
             try
@@ -59,7 +82,6 @@ namespace VinhKhanhFoodTour.API.Controllers
             try
             {
                 var pendingPois = await _poiService.GetPendingPoisAsync();
-
                 return Ok(pendingPois);
             }
             catch (Exception)
@@ -76,7 +98,6 @@ namespace VinhKhanhFoodTour.API.Controllers
             try
             {
                 var poi = await _poiService.ApprovePoiAsync(id);
-
                 return Ok(new { Message = "Đã duyệt quán ăn thành công!", Id = poi.Id });
             }
             catch (KeyNotFoundException ex)
@@ -97,7 +118,6 @@ namespace VinhKhanhFoodTour.API.Controllers
             try
             {
                 var poi = await _poiService.RejectPoiAsync(id, request.Reason);
-
                 return Ok(new { Message = "Đã từ chối quán ăn thành công!", Id = poi.Id });
             }
             catch (KeyNotFoundException ex)
@@ -198,7 +218,6 @@ namespace VinhKhanhFoodTour.API.Controllers
             try
             {
                 var approvedPois = await _poiService.GetPublicPoisAsync();
-
                 return Ok(approvedPois);
             }
             catch (Exception ex)
@@ -215,7 +234,6 @@ namespace VinhKhanhFoodTour.API.Controllers
             try
             {
                 var mapPins = await _poiService.GetMapPinsAsync();
-
                 return Ok(mapPins);
             }
             catch (Exception ex)
@@ -225,7 +243,6 @@ namespace VinhKhanhFoodTour.API.Controllers
         }
 
         // API: Lấy danh sách các quán ăn gần người dùng (Public - dựa trên vị trí)
-        // Spatial query performed at the database level using NetTopologySuite
         [HttpGet("public/nearby")]
         [AllowAnonymous]
         public async Task<IActionResult> GetNearbyPois([FromQuery] double userLat, [FromQuery] double userLng, [FromQuery] double radiusInMeters = 50)
@@ -233,7 +250,6 @@ namespace VinhKhanhFoodTour.API.Controllers
             try
             {
                 var nearbyPois = await _poiService.GetNearbyPoisAsync(userLat, userLng, radiusInMeters);
-
                 return Ok(nearbyPois);
             }
             catch (Exception ex)
@@ -249,7 +265,6 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                // 1. Extract current user's ID from JWT claims
                 var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
                     ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
                 if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
@@ -279,7 +294,6 @@ namespace VinhKhanhFoodTour.API.Controllers
                     await _syncOrchestrator.TryRefreshOfflinePackAsync();
                 }
 
-                // Return Ok with updated ImageUrl and AudioFilePath
                 return Ok(new
                 {
                     Message = "Đã tải lên tệp media thành công!",

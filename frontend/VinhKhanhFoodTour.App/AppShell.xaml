@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="VinhKhanhFoodTour.App.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:VinhKhanhFoodTour.App.Pages"
+    Shell.FlyoutBehavior="Disabled"
+    Shell.TabBarBackgroundColor="White"
+    Shell.TabBarTitleColor="#FFC107"
+    Shell.TabBarUnselectedColor="Gray">
+
+    <TabBar>
+        <Tab Title="Địa điểm" Icon="icon_list.png">
+            <ShellContent
+                Title="Địa điểm"
+                ContentTemplate="{DataTemplate pages:MainPage}"
+                Route="MainPage" />
+        </Tab>
+
+        <Tab Title="Bản đồ" Icon="icon_map.png">
+            <ShellContent
+                Title="Bản đồ"
+                ContentTemplate="{DataTemplate pages:MapPage}"
+                Route="MapPage" />
+        </Tab>
+
+        <Tab Title="Hồ sơ" Icon="icon_user.png">
+            <ShellContent
+                Title="Hồ sơ"
+                ContentTemplate="{DataTemplate pages:ProfilePage}"
+                Route="ProfilePage" />
+        </Tab>
+    </TabBar>
+
+</Shell>
