@@ -145,7 +145,7 @@ public class ApiService
         {
             Debug.WriteLine($"[API] GET /Poi/{poiId}");
             await SetAuthHeaderAsync();
-            var response = await _httpClient.GetAsync($"Poi/{poiId}");
+            var response = await _httpClient.GetAsync($"Poi/public/{poiId}");
 
             if (!response.IsSuccessStatusCode)
             {
