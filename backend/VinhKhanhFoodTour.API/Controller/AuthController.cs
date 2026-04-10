@@ -24,13 +24,32 @@ namespace VinhKhanhFoodTour.API.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            // 1. Tìm user trong DB (Lúc seed data mình để pass là chữ "0", "1", "2")
+            // 1. Tìm user trong DB theo Username
             var user = await _context.Users
                 .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.Username == request.Username && u.PasswordHash == request.Password);
+                .FirstOrDefaultAsync(u => u.Username == request.Username);
 
             if (user == null)
             {
+                return Unauthorized(new { Message = "Sai tài khoản hoặc mật khẩu!" });
+            }
+
+            // Kiểm tra mật khẩu bằng BCrypt, HOẶC hỗ trợ fallback nếu mk cũ là PlainText
+            bool isPasswordCorrect = false;
+            try
+            {
+                isPasswordCorrect = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            }
+            catch 
+            {
+                // Nếu PasswordHash không phải là mã BCrypt hợp lệ (VD: user tự seed tay là "0", "1")
+                isPasswordCorrect = (user.PasswordHash == request.Password);
+            }
+
+            if (!isPasswordCorrect && user.PasswordHash != request.Password)
+            {
+                // Trường hợp BCrypt ném Exception ở trên nhưng phép gán cuối vẫn Fail
+                // Hoặc BCrypt không throw Exception nhưng Verify() trả về false, ta cho phép kiểm tra fallback thêm lần nữa cho an toàn.
                 return Unauthorized(new { Message = "Sai tài khoản hoặc mật khẩu!" });
             }
 
@@ -59,6 +78,8 @@ namespace VinhKhanhFoodTour.API.Controllers
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
                 Role = user.Role.RoleName,
+                Username = user.Username,
+                Email = user.Email ?? "Chưa cập nhật email",
                 Expiration = token.ValidTo
             });
         }
@@ -86,12 +107,15 @@ namespace VinhKhanhFoodTour.API.Controllers
                 return BadRequest(new { Message = $"Lỗi hệ thống: Không tìm thấy Role {roleToAssign}!" });
             }
 
-            // 3. Tạo User mới
+            // 3. Tạo mã băm cho Mật Khẩu (Bảo mật)
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            // 4. Tạo User mới
             var user = new VinhKhanhFoodTour.Models.User
             {
                 Username = request.Username,
                 Email = request.Email,
-                PasswordHash = request.Password, // Lưu trơn theo cơ chế hiện tại
+                PasswordHash = passwordHash,
                 RoleId = role.Id,
                 IsActive = true,
                 PreferredLanguage = "vi" // Mặc định tiếng Việt
