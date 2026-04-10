@@ -43,6 +43,92 @@
                         Toggled="OnAutoPlayToggled" />
             </Grid>
         </Border>
+
+        <!-- Vùng nền mờ (Tap để đóng card) - PHẢI đặt TRƯỚC InfoCard để InfoCard hiển thị trên nó -->
+        <BoxView x:Name="DimOverlay"
+                 BackgroundColor="#80000000"
+                 IsVisible="False"
+                 ZIndex="150">
+            <BoxView.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnOverlayTapped" />
+            </BoxView.GestureRecognizers>
+        </BoxView>
+
+        <!-- ====== INFO CARD (Hiện khi nhấn Pin) - PHẢI đặt SAU DimOverlay ====== -->
+        <Border x:Name="InfoCard"
+                VerticalOptions="End"
+                HorizontalOptions="Fill"
+                IsVisible="False"
+                Margin="0"
+                Padding="0,0,0,0"
+                StrokeShape="RoundRectangle 24,24,0,0"
+                StrokeThickness="0"
+                BackgroundColor="#1A1A1A"
+                ZIndex="200">
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,-4" Opacity="0.6" Radius="20" />
+            </Border.Shadow>
+
+            <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="0">
+                <!-- Thanh kéo (drag handle) -->
+                <BoxView Grid.Row="0"
+                         WidthRequest="40" HeightRequest="4"
+                         Color="#555555"
+                         CornerRadius="2"
+                         HorizontalOptions="Center"
+                         Margin="0,12,0,8" />
+
+                <!-- Ảnh quán (Bo góc) -->
+                <Border Grid.Row="1"
+                        Margin="16,0,16,0"
+                        StrokeShape="RoundRectangle 16"
+                        StrokeThickness="0">
+                    <Image x:Name="CardImage"
+                           Aspect="AspectFill"
+                           HeightRequest="180"
+                           HorizontalOptions="Fill" />
+                </Border>
+
+                <!-- Thông tin và nút bấm -->
+                <VerticalStackLayout Grid.Row="2" Padding="16,12,16,24" Spacing="10">
+
+                    <!-- Tên & Mô tả -->
+                    <Label x:Name="CardName"
+                           FontSize="20"
+                           FontAttributes="Bold"
+                           TextColor="#FF5722" />
+
+                    <Label x:Name="CardTitle"
+                           FontSize="14"
+                           TextColor="#CCCCCC"
+                           MaxLines="2"
+                           LineBreakMode="TailTruncation" />
+
+                    <!-- 2 Nút hành động -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,4,0,0">
+                        <Button Grid.Column="0"
+                                x:Name="BtnSpeak"
+                                Text="🔊 Thuyết minh"
+                                BackgroundColor="#2E7D32"
+                                TextColor="White"
+                                CornerRadius="10"
+                                HeightRequest="44"
+                                FontSize="13"
+                                Clicked="OnSpeakClicked" />
+
+                        <Button Grid.Column="1"
+                                Text="📋 Chi tiết"
+                                BackgroundColor="#1E88E5"
+                                TextColor="White"
+                                CornerRadius="10"
+                                HeightRequest="44"
+                                FontSize="13"
+                                Clicked="OnDetailClicked" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
     </Grid>
+
 
 </ContentPage>

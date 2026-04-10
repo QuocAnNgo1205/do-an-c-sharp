@@ -1,6 +1,7 @@
 using Microsoft.Maui.Maps;
 using Microsoft.Maui.Controls.Maps;
 using VinhKhanhFoodTour.App.Services;
+using VinhKhanhFoodTour.App.Models;
 
 namespace VinhKhanhFoodTour.App.Pages;
 
@@ -11,15 +12,25 @@ public partial class MapPage : ContentPage
 {
     private readonly IPoiService _poiService;
     private readonly GeofenceManager _geofenceManager;
+    private readonly AudioGuideService _audioGuideService;
+    private readonly PoiCacheService _poiCache;
+
+    // Ánh xạ từ Pin → Poi để biết quán nào khi nhấn pin
+    private readonly Dictionary<Pin, Poi> _poiLookup = new();
+    private Poi? _selectedPoi;
+    private bool _isCardVisible = false;
+
     public string? Lat { get; set; }
     public string? Lon { get; set; }
     public string? Name { get; set; }
 
-    public MapPage(IPoiService poiService, GeofenceManager geofenceManager)
+    public MapPage(IPoiService poiService, GeofenceManager geofenceManager, AudioGuideService audioGuideService, PoiCacheService poiCache)
     {
         InitializeComponent();
         _poiService = poiService;
         _geofenceManager = geofenceManager;
+        _audioGuideService = audioGuideService;
+        _poiCache = poiCache;
 
         // Khôi phục trạng thái Toggle từ Preferences
         autoPlaySwitch.IsToggled = Preferences.Default.Get("AutoPlayLocationTracking", false);
@@ -62,8 +73,21 @@ public partial class MapPage : ContentPage
     {
         try
         {
-            var pois = await _poiService.GetPublicPoisAsync();
+            // Tải dữ liệu từ Local SQLite Cache trước (tốc độ < 10ms & hỗ trợ offline)
+            var pois = await _poiCache.GetCachedPoisAsync();
+            
+            // Nếu SQLite trống (lần đầu tiên mở app), fallback gọi Data tĩnh từ Public API
+            if (pois.Count == 0)
+            {
+                pois = await _poiService.GetPublicPoisAsync();
+                if (pois.Count > 0)
+                {
+                    _ = _poiCache.SavePoisAsync(pois); // Lưu ngầm xuống CSDL
+                }
+            }
+
             foodMap.Pins.Clear();
+            _poiLookup.Clear();
 
             foreach (var poi in pois)
             {
@@ -72,12 +96,45 @@ public partial class MapPage : ContentPage
                     var pin = new Pin
                     {
                         Label = poi.Name,
-                        // 👉 THÊM: Hiện tiêu đề/mô tả dưới tên quán
                         Address = poi.Title ?? poi.Description,
                         Location = new Location(poi.Latitude, poi.Longitude),
                         Type = PinType.Place
                     };
 
+                    var capturedPoi = poi; // Closure capture
+                    pin.MarkerClicked += async (s, e) =>
+                    {
+                        e.HideInfoWindow = true; // Tắt popup mặc định của Maps
+
+                        // PHẢI chạy trên Main Thread mới cập nhật UI được
+                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                        {
+                            _selectedPoi = capturedPoi;
+
+                            // Cập nhật nội dung Info Card
+                            CardName.Text = capturedPoi.Name;
+
+                            string description = capturedPoi.Title ?? capturedPoi.Description ?? string.Empty;
+                            if (string.IsNullOrWhiteSpace(description))
+                            {
+                                description = "Một địa điểm ẩm thực hấp dẫn không thể bỏ lỡ tại phố ẩm thực Vĩnh Khánh. Hãy nhấn vào chi tiết để khám phá ngay!";
+                            }
+                            CardTitle.Text = description;
+                            CardImage.Source = !string.IsNullOrEmpty(capturedPoi.ImageUrl)
+                                ? ImageSource.FromUri(new Uri(capturedPoi.ImageUrl))
+                                : null;
+
+                            // Trượt card lên
+                            await ShowInfoCardAsync();
+
+                            // Zoom bản đồ về quán đó
+                            foodMap.MoveToRegion(MapSpan.FromCenterAndRadius(
+                                new Location(capturedPoi.Latitude, capturedPoi.Longitude),
+                                Distance.FromKilometers(0.3)));
+                        });
+                    };
+
+                    _poiLookup[pin] = poi;
                     foodMap.Pins.Add(pin);
                 }
             }
@@ -88,14 +145,77 @@ public partial class MapPage : ContentPage
         }
     }
 
+    // ===== ANIMATION TRƯỢT LÊN =====
+    private async Task ShowInfoCardAsync()
+    {
+        if (_isCardVisible) return;
+        _isCardVisible = true;
+
+        // Bắt buộc Android phải measure kích thước bằng cách đặt ngoài tầm nhìn rồi mới hiện
+        InfoCard.TranslationY = 500;
+        InfoCard.IsVisible = true;
+
+        DimOverlay.IsVisible = true;
+        DimOverlay.Opacity = 0;
+
+        await Task.WhenAll(
+            InfoCard.TranslateTo(0, 0, 300, Easing.CubicOut),
+            DimOverlay.FadeTo(1, 200)
+        );
+    }
+
+    // ===== ANIMATION TRƯỢT XUỐNG =====
+    private async Task HideInfoCardAsync()
+    {
+        if (!_isCardVisible) return;
+        _isCardVisible = false;
+
+        await Task.WhenAll(
+            InfoCard.TranslateTo(0, 500, 250, Easing.CubicIn),
+            DimOverlay.FadeTo(0, 200)
+        );
+
+        DimOverlay.IsVisible = false;
+        InfoCard.IsVisible = false;
+        _selectedPoi = null;
+    }
+
+    // Nhấn nền mờ để đóng card
+    private async void OnOverlayTapped(object? sender, TappedEventArgs e)
+    {
+        await HideInfoCardAsync();
+    }
+
+    // ===== NÚT NGHE THUYẾT MINH =====
+    private async void OnSpeakClicked(object? sender, EventArgs e)
+    {
+        if (_selectedPoi == null) return;
+        Preferences.Default.Set("PendingSpeakPoiId", _selectedPoi.Id);
+        await HideInfoCardAsync();
+        await Shell.Current.GoToAsync("//MainPage");
+    }
+
+    // ===== NÚT XEM CHI TIẾT =====
+    private async void OnDetailClicked(object? sender, EventArgs e)
+    {
+        if (_selectedPoi == null) return;
+        var poi = _selectedPoi;
+        await HideInfoCardAsync();
+
+        await Shell.Current.GoToAsync("project", new Dictionary<string, object>
+        {
+            { "Poi", poi }
+        });
+    }
+
     private async void OnAutoPlayToggled(object? sender, ToggledEventArgs e)
     {
         bool isEnabled = e.Value;
-        
+
         if (isEnabled)
         {
             var status = await CheckAndRequestLocationPermission();
-            
+
             if (status != PermissionStatus.Granted)
             {
                 autoPlaySwitch.IsToggled = false;
