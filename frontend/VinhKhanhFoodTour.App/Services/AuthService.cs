@@ -30,8 +30,15 @@ public class AuthService
                 {
                     // 🔐 Lưu Token vào SecureStorage
                     await SecureStorage.SetAsync("jwt_token", result.Token);
-                    await SecureStorage.SetAsync("user_name", result.Username);
+                    // DÙNG BIẾN username TỪ THAM SỐ ĐÚNG Ở TRÊN VÌ API KHÔNG TRẢ VỀ FIELD NÀY
+                    await SecureStorage.SetAsync("user_name", username);
                     await SecureStorage.SetAsync("user_role", result.Role);
+                    await SecureStorage.SetAsync("user_email", string.IsNullOrEmpty(result.Email) ? "Chưa cập nhật email" : result.Email);
+                    await SecureStorage.SetAsync("token_expiration", result.Expiration.HasValue ? result.Expiration.Value.ToString("o") : DateTime.UtcNow.AddDays(7).ToString("o"));
+
+                    // 🌍 PHỤC HỒI NGÔN NGỮ CỦA RIÊNG TÀI KHOẢN NÀY (Mặc định là 'vi' - tiếng Việt)
+                    var userLang = Preferences.Default.Get($"PreferredLanguage_{username}", "vi");
+                    Preferences.Default.Set("PreferredLanguage", userLang);
 
                     Debug.WriteLine("[Auth] Login successful, token saved.");
                     return (true, "Đăng nhập thành công!");
@@ -84,6 +91,11 @@ public class AuthService
         SecureStorage.Remove("jwt_token");
         SecureStorage.Remove("user_name");
         SecureStorage.Remove("user_role");
+        SecureStorage.Remove("user_email");
+        SecureStorage.Remove("token_expiration");
+        
+        // Reset lại cờ chọn ngôn ngữ để acc sau (hoặc đăng ký mới) đăng nhập vào sẽ được hỏi lại
+        Preferences.Default.Remove("HasSelectedLanguageFirstTime");
     }
 
     public async Task<bool> IsLoggedInAsync()
@@ -98,4 +110,6 @@ public class LoginResponse
     public string Token { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public DateTime? Expiration { get; set; }
 }

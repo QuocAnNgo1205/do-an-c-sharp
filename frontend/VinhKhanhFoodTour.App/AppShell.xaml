@@ -14,6 +14,11 @@
         </Style>
     </Shell.Resources>
 
+    <!-- ⏳ SPLASH: Hiển thị khi khởi động, che nháy Login -->
+    <ShellItem Route="SplashPage" FlyoutItemIsVisible="False">
+        <ShellContent ContentTemplate="{DataTemplate pages:SplashPage}" />
+    </ShellItem>
+
     <!-- 🔐 LUỒNG AUTH: LoginPage (Ẩn khỏi TabBar) -->
     <ShellItem Route="LoginPage" FlyoutItemIsVisible="False">
         <ShellContent ContentTemplate="{DataTemplate pages:LoginPage}" />
