@@ -17,10 +17,10 @@ namespace VinhKhanhFoodTour.App.PageModels
         private string? userName;
 
         [ObservableProperty]
-        private string? userRole;
+        private string? userEmail;
 
         [ObservableProperty]
-        private Poi? featuredPoi;
+        private string? userRole;
 
         [ObservableProperty]
         private bool isBusy;
@@ -30,6 +30,9 @@ namespace VinhKhanhFoodTour.App.PageModels
 
         [ObservableProperty]
         private LanguageInfo? selectedLanguage;
+
+        [ObservableProperty]
+        private bool isLanguageListExpanded;
 
         private bool _isInitializing;
 
@@ -65,7 +68,9 @@ namespace VinhKhanhFoodTour.App.PageModels
         private async Task UpdateLanguageAsync(string langCode)
         {
             // 1. Lưu Local ngay lập tức để UX mượt mà
-            Preferences.Default.Set("PreferredLanguage", langCode);
+            string userName = await SecureStorage.GetAsync("user_name") ?? "guest";
+            Preferences.Default.Set($"PreferredLanguage_{userName}", langCode); // Ghi nhớ riêng cho tài khoản
+            Preferences.Default.Set("PreferredLanguage", langCode); // Cập nhật trạng thái chung để đồng bộ vào Audio Service
 
             // 2. Đồng bộ lên Server (nếu thất bại cũng không sao vì đã có Local)
             try
@@ -83,26 +88,36 @@ namespace VinhKhanhFoodTour.App.PageModels
         {
             if (language == null) return;
             SelectedLanguage = language;
-            // OnSelectedLanguageChanged sẽ được gọi tự động
+            IsLanguageListExpanded = false; // Tự động thu gọn lại
             
             await Shell.Current.DisplayAlertAsync("Thành công", $"Đã chọn: {language.Name} {language.Flag}", "OK");
         }
 
         [RelayCommand]
+        private void ToggleLanguageList()
+        {
+            IsLanguageListExpanded = !IsLanguageListExpanded;
+        }
+
+        [RelayCommand]
         public async Task LoadProfileData()
         {
+            // LUÔN LUÔN cập nhật tên/email ngay từ giây đầu tiên bước vào trang (Bypass IsBusy)
+            UserName = await SecureStorage.GetAsync("user_name") ?? "Khách";
+            UserEmail = await SecureStorage.GetAsync("user_email") ?? "Chưa cập nhật email";
+            UserRole = await SecureStorage.GetAsync("user_role") ?? "Tourist";
+
             if (IsBusy) return;
             IsBusy = true;
 
             try
             {
-                // Lấy danh sách quán và chọn quán đầu tiên làm "Quán tiêu biểu" cho Profile
-                var pois = await _apiService.GetPoisAsync();
-                if (pois != null && pois.Count > 0)
-                {
-                    // Lấy chi tiết đầy đủ của quán đầu tiên (để có Description)
-                    FeaturedPoi = await _apiService.GetPoiDetailAsync(pois[0].Id);
-                }
+                // LUÔN LẤY LẠI NGÔN NGỮ KHI TRANG HIỂN THỊ
+                var savedLang = Preferences.Default.Get("PreferredLanguage", "vi");
+                _isInitializing = true;
+                SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.Code == savedLang) 
+                                  ?? AvailableLanguages.First();
+                _isInitializing = false;
             }
             catch (Exception ex)
             {
@@ -111,10 +126,6 @@ namespace VinhKhanhFoodTour.App.PageModels
             finally
             {
                 IsBusy = false;
-                
-                // Cập nhật thông tin user từ Storage
-                UserName = await SecureStorage.GetAsync("user_name") ?? "Khách";
-                UserRole = await SecureStorage.GetAsync("user_role") ?? "Tourist";
             }
         }
 
@@ -127,44 +138,6 @@ namespace VinhKhanhFoodTour.App.PageModels
                 _authService.Logout();
                 await Shell.Current.GoToAsync("//LoginPage");
             }
-        }
-
-        [RelayCommand]
-        private async Task ToggleAudio()
-        {
-            if (FeaturedPoi == null) return;
-
-            if (FeaturedPoi.IsPlaying)
-            {
-                await _audioGuideService.StopAudioAsync();
-                FeaturedPoi.IsPlaying = false;
-            }
-            else
-            {
-                try
-                {
-                    FeaturedPoi.IsLoadingAudio = true;
-                    // PlayAudioAsync hiện đã nhận callback để đồng bộ trạng thái UI
-                    // Ngôn ngữ được tự động lấy từ Preferences bên trong Service
-                    await _audioGuideService.PlayAudioAsync(FeaturedPoi, isPlaying => 
-                    {
-                        FeaturedPoi.IsPlaying = isPlaying;
-                        if (!isPlaying) FeaturedPoi.IsLoadingAudio = false;
-                    });
-                }
-                catch { }
-                finally
-                {
-                    FeaturedPoi.IsLoadingAudio = false;
-                }
-            }
-        }
-
-        [RelayCommand]
-        private async Task StopAudio()
-        {
-            await _audioGuideService.StopAudioAsync();
-            if (FeaturedPoi != null) FeaturedPoi.IsPlaying = false;
         }
     }
 

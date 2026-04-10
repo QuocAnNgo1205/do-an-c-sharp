@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VinhKhanhFoodTour.App.Data;
 using VinhKhanhFoodTour.App.Models;
 using VinhKhanhFoodTour.App.Services;
 
@@ -9,6 +10,7 @@ namespace VinhKhanhFoodTour.App.PageModels
     public partial class ProjectDetailPageModel : ObservableObject
     {
         private readonly AudioGuideService _audioGuideService;
+        private readonly ApiService _apiService;
 
         [ObservableProperty]
         private Poi? poi;
@@ -19,15 +21,61 @@ namespace VinhKhanhFoodTour.App.PageModels
         [ObservableProperty]
         private bool isLoadingAudio;
 
-        public ProjectDetailPageModel(AudioGuideService audioGuideService)
+        [ObservableProperty]
+        private string displayDescription = "Đang tải thông tin...";
+
+        public ProjectDetailPageModel(AudioGuideService audioGuideService, ApiService apiService)
         {
             _audioGuideService = audioGuideService;
+            _apiService = apiService;
+        }
+
+        async partial void OnPoiChanged(Poi? value)
+        {
+            if (value != null)
+            {
+                await LoadPoiDetailsAsync(value);
+            }
+        }
+
+        private async Task LoadPoiDetailsAsync(Poi currentPoi)
+        {
+            try
+            {
+                // Kiểm tra nếu chưa có bản dịch, tải chi tiết từ API
+                if (currentPoi.Translations == null || currentPoi.Translations.Count == 0)
+                {
+                    var fullPoi = await _apiService.GetPoiDetailAsync(currentPoi.Id);
+                    if (fullPoi?.Translations != null)
+                    {
+                        currentPoi.Translations = fullPoi.Translations;
+                    }
+                }
+
+                // Lấy bản dịch phù hợp theo ngôn ngữ
+                string languageCode = Preferences.Default.Get("PreferredLanguage", Constants.DEFAULT_LANGUAGE_CODE);
+                var translation = _audioGuideService.GetPreferredTranslation(currentPoi, languageCode);
+                
+                if (translation != null)
+                {
+                    // Ghép Title và Description để hiển thị giống những gì được phát âm
+                    DisplayDescription = $"{translation.Title}. {translation.Description}";
+                }
+                else
+                {
+                    DisplayDescription = currentPoi.Description ?? "Chưa có thông tin giới thiệu chi tiết cho địa điểm này.";
+                }
+            }
+            catch
+            {
+                DisplayDescription = currentPoi.Description ?? "Không thể tải thông tin giới thiệu.";
+            }
         }
 
         /// <summary>
         /// Bật/Tắt thuyết minh (Audio Guide)
         /// </summary>
-        [RelayCommand]
+        [RelayCommand(AllowConcurrentExecutions = true)]
         private async Task ToggleAudio()
         {
             if (Poi == null) return;

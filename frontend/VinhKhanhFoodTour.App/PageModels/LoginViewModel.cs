@@ -7,6 +7,7 @@ namespace VinhKhanhFoodTour.App.PageModels;
 public partial class LoginViewModel : ObservableObject
 {
     private readonly AuthService _authService;
+    private readonly ApiService _apiService;
 
     [ObservableProperty]
     private string username = string.Empty;
@@ -17,9 +18,10 @@ public partial class LoginViewModel : ObservableObject
     [ObservableProperty]
     private bool isBusy;
 
-    public LoginViewModel(AuthService authService)
+    public LoginViewModel(AuthService authService, ApiService apiService)
     {
         _authService = authService;
+        _apiService = apiService;
     }
 
     [RelayCommand]
@@ -27,7 +29,7 @@ public partial class LoginViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
         {
-            await Shell.Current.DisplayAlertAsync("⚠️ Thiếu thông tin", "Vui lòng nhập tên đăng nhập và mật khẩu.", "OK");
+            await Shell.Current.DisplayAlert("⚠️ Thiếu thông tin", "Vui lòng nhập tên đăng nhập và mật khẩu.", "OK");
             return;
         }
 
@@ -42,7 +44,7 @@ public partial class LoginViewModel : ObservableObject
             }
             else
             {
-                await Shell.Current.DisplayAlertAsync("❌ Thất bại", result.Message, "OK");
+                await Shell.Current.DisplayAlert("❌ Thất bại", result.Message, "OK");
             }
         }
         catch (Exception ex)

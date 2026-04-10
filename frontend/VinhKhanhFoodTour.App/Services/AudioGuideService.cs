@@ -21,6 +21,10 @@ public class AudioGuideService
     private bool _isPlaying = false;
     private CancellationTokenSource? _playingCancellation;
 
+    // 🛑 MỚI: Event phát tín hiệu khi âm thanh bắt đầu hoặc dừng (Cho UI cập nhật)
+    public event EventHandler<(int PoiId, bool IsPlaying)>? PlaybackStateChanged;
+    private int? _currentPlayingPoiId;
+
     public AudioGuideService(IAudioManager audioManager, ApiService apiService)
     {
         _audioManager = audioManager;
@@ -59,7 +63,11 @@ public class AudioGuideService
             await StopAudioAsync();
 
             _isPlaying = true;
+            _currentPlayingPoiId = poi.Id;
             _playingCancellation = new CancellationTokenSource();
+            
+            // Báo cho UI biết là quán này bắt đầu phát
+            PlaybackStateChanged?.Invoke(this, (poi.Id, true));
 
             // 🎵 Bước 2: Thử phát MP3 (Layer 1)
             if (!string.IsNullOrWhiteSpace(translation.AudioFilePath))
@@ -74,6 +82,7 @@ public class AudioGuideService
                     {
                         _isPlaying = false;
                         onStateChanged?.Invoke(false);
+                        PlaybackStateChanged?.Invoke(this, (poi.Id, false));
                     };
                     _activePlayer.Play();
                     onStateChanged?.Invoke(true);
@@ -130,6 +139,7 @@ public class AudioGuideService
             if (_activePlayer == null || !_activePlayer.IsPlaying)
             {
                 onStateChanged?.Invoke(false);
+                PlaybackStateChanged?.Invoke(this, (poi.Id, false));
             }
         }
     }
@@ -156,6 +166,13 @@ public class AudioGuideService
             }
 
             _isPlaying = false;
+            
+            if (_currentPlayingPoiId.HasValue)
+            {
+                PlaybackStateChanged?.Invoke(this, (_currentPlayingPoiId.Value, false));
+                _currentPlayingPoiId = null;
+            }
+
             Debug.WriteLine("[AudioGuide] ⏹️ All audio stopped");
         }
         catch (Exception ex)

@@ -89,7 +89,7 @@
                                FontAttributes="Bold" 
                                TextColor="#FFC107"/>
 
-                        <Label Text="{Binding Poi.Description}" 
+                        <Label Text="{Binding DisplayDescription}" 
                                FontSize="16" 
                                TextColor="#D0D0D0" 
                                LineHeight="1.5" />

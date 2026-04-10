@@ -10,14 +10,13 @@ public partial class ProfilePage : ContentPage
         BindingContext = model;
     }
 
-    protected override void OnDisappearing()
+    protected override void OnAppearing()
     {
-        base.OnDisappearing();
+        base.OnAppearing();
         
-        // Dừng âm thanh khi rời khỏi tab Hồ sơ
         if (BindingContext is ProfilePageModel model)
         {
-            model.StopAudioCommand.Execute(null);
+            model.LoadProfileDataCommand.Execute(null);
         }
     }
 }
