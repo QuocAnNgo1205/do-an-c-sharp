@@ -12,6 +12,7 @@ namespace VinhKhanhFoodTour.App.Services
         private readonly ILocationTrackingService _locationService;
         private readonly ApiService _apiService;
         private readonly AudioGuideService _audioService;
+        private readonly PoiCacheService _poiCache;
         
         // Cấu hình Geofence
         private const double TRIGGER_RADIUS_METERS = 30; 
@@ -24,11 +25,13 @@ namespace VinhKhanhFoodTour.App.Services
         public GeofenceManager(
             ILocationTrackingService locationService, 
             ApiService apiService, 
-            AudioGuideService audioService)
+            AudioGuideService audioService,
+            PoiCacheService poiCache)
         {
             _locationService = locationService;
             _apiService = apiService;
             _audioService = audioService;
+            _poiCache = poiCache;
 
             // Đăng ký nhận tọa độ từ Service chạy ngầm
             _locationService.LocationUpdated += OnLocationUpdated;
@@ -38,16 +41,36 @@ namespace VinhKhanhFoodTour.App.Services
         {
             try 
             {
-                // 1. Nếu chưa có danh sách POI, nạp từ API
+                // 1. Nếu chưa có danh sách POI, nạp từ SQLite Cache (Offline-ready)
                 if (_allPois == null || _allPois.Count == 0)
                 {
-                    _allPois = await _apiService.GetPoisAsync();
-                    if (_allPois == null) return;
+                    _allPois = await _poiCache.GetCachedPoisAsync();
+                    
+                    // Fallback nếu Cache trống
+                    if (_allPois == null || _allPois.Count == 0)
+                    {
+                        var onlinePois = await _apiService.GetPoisAsync();
+                        if (onlinePois != null && onlinePois.Count > 0)
+                        {
+                            _allPois = onlinePois;
+                            _ = _poiCache.SavePoisAsync(_allPois);
+                        }
+                        else return;
+                    }
+                }
+
+                // NẾU ĐANG PHÁT AUDIO THÌ KHÔNG LÀM PHIỀN
+                if (_audioService.IsPlaying)
+                {
+                    return;
                 }
 
                 var userLocation = new Location(e.Latitude, e.Longitude);
+                
+                Poi? closestPoi = null;
+                double minDistance = double.MaxValue;
 
-                // 2. Quét qua tất cả quán ăn để kiểm tra khoảng cách
+                // 2. Quét qua tất cả quán ăn để tìm quán GẦN NHẤT trong bán kính
                 foreach (var poi in _allPois)
                 {
                     if (poi.Latitude == 0 || poi.Longitude == 0) continue;
@@ -56,52 +79,65 @@ namespace VinhKhanhFoodTour.App.Services
                     double distanceKm = userLocation.CalculateDistance(poiLocation, DistanceUnits.Kilometers);
                     double distanceMeters = distanceKm * 1000;
 
-                    // 3. Nếu khoảng cách < 30m
-                    if (distanceMeters <= TRIGGER_RADIUS_METERS)
+                    // 3. Nếu khoảng cách < 30m và có thể phát (kiểm tra Cooldown)
+                    if (distanceMeters <= TRIGGER_RADIUS_METERS && CanPlayAudio(poi.Id))
                     {
-                        Debug.WriteLine($"[GEOFENCE TRIGGERED] Khoảng cách: {distanceMeters:F1}m đến {poi.Name}. Đang gọi Audio...");
-                        
-                        // 4. TẠM TẮT Cool-down (30 phút qua đã phát chưa?) ĐỂ TEST
-                        // if (CanPlayAudio(poi.Id))
-                        if (true) // Bỏ qua cooldown để phát lặp lại khi ở gần
+                        if (distanceMeters < minDistance)
                         {
-                            Debug.WriteLine($"[Geofence] 🎯 USER IS NEAR: {poi.Name} ({distanceMeters:F1}m). Triggering Audio...");
-                            
-                            // Phát Audio Guide (Hàm này đã tự xử lý Fallback & Language)
-                            // Sử dụng MainThread để gọi AudioService
-                            MainThread.BeginInvokeOnMainThread(async () => 
-                            {
-                                try 
-                                {
-                                    // Lấy chi tiết quán (để có bản dịch đầy đủ) - Tắt Alert khi chạy ngầm
-                                    var detail = await _apiService.GetPoiDetailAsync(poi.Id, showErrorAlert: false);
-                                    if (detail != null)
-                                    {
-                                        Debug.WriteLine($"[Geofence] 🎯 TRIGGERING AUDIO FOR: {detail.Name}");
-                                        await _audioService.PlayAudioAsync(detail, showErrors: false);
-                                    }
-                                    else 
-                                    {
-                                        Debug.WriteLine($"[Geofence ERROR] Could not fetch detail for POI ID: {poi.Id}");
-                                        ShowToast($"Không thể tải dữ liệu cho: {poi.Name}");
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[Geofence THREAD ERROR] {ex.Message}");
-                                }
-                            });
-
-                            // Lưu mốc thời gian đã phát
-                            _lastPlayedPois[poi.Id] = DateTime.UtcNow;
+                            minDistance = distanceMeters;
+                            closestPoi = poi;
                         }
                     }
+                }
+
+                // 4. Phát cho quán gần nhất tìm được
+                if (closestPoi != null)
+                {
+                    Debug.WriteLine($"[Geofence] 🎯 USER IS NEAR CLOSEST POI: {closestPoi.Name} ({minDistance:F1}m). Triggering Audio...");
+                    
+                    // Ghi sổ ngay lập tức để block các call tiếp theo
+                    _lastPlayedPois[closestPoi.Id] = DateTime.UtcNow;
+
+                    MainThread.BeginInvokeOnMainThread(async () => 
+                    {
+                        try 
+                        {
+                            // VI DIỆU: Offline-Ready tuyệt đối!
+                            // Các POI tải từ SQLite Cache ĐÃ BAO GỒM sẵn Translations!
+                            // Nên chúng ta KHÔNG CẦN GỌI API API Detail nữa mà phát NGAY LẬP TỨC!
+                            if (closestPoi.Translations != null && closestPoi.Translations.Count > 0)
+                            {
+                                Debug.WriteLine($"[Geofence] 🎯 TRIGGERING AUDIO FOR: {closestPoi.Name} (Offline Mode: OK)");
+                                await _audioService.PlayAudioAsync(closestPoi, showErrors: false);
+                            }
+                            else
+                            {
+                                // Nếu vì lý do nào đó cache bị rỗng dịch thuật, thử fallback API ngầm
+                                var detail = await _apiService.GetPoiDetailAsync(closestPoi.Id, showErrorAlert: false);
+                                if (detail != null)
+                                {
+                                    Debug.WriteLine($"[Geofence] 🎯 TRIGGERING AUDIO FOR: {detail.Name} (Fallback API)");
+                                    await _audioService.PlayAudioAsync(detail, showErrors: false);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[Geofence THREAD ERROR] {ex.Message}");
+                        }
+                    });
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Geofence ERROR] {ex.Message}");
             }
+        }
+
+        public void RegisterManualPlay(int poiId)
+        {
+            _lastPlayedPois[poiId] = DateTime.UtcNow;
+            Debug.WriteLine($"[Geofence] 📝 Registered manual play for POI {poiId}. Cooldown started.");
         }
 
         private bool CanPlayAudio(int poiId)
