@@ -46,6 +46,7 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IPoiService, PoiService>();
         builder.Services.AddSingleton<ApiService>();
         builder.Services.AddSingleton<AuthService>(); // 🔐 MỚI: Dịch vụ xác thực
+        builder.Services.AddSingleton<PoiCacheService>(); // 💾 MỚI: Cache SQLite
         builder.Services.AddSingleton(AudioManager.Current);
         builder.Services.AddSingleton<AudioGuideService>();  // 🔴 MỚI: Thuyết minh thông minh
         builder.Services.AddSingleton<SeedDataService>();
@@ -77,6 +78,7 @@ public static class MauiProgram
         builder.Services.AddTransient<LoginPage>();
         builder.Services.AddTransient<RegisterViewModel>();
         builder.Services.AddTransient<RegisterPage>();
+        builder.Services.AddTransient<SplashPage>(); // ⏳ Splash screen
 
         // Đăng ký AppShell để quản lý các Tab
         builder.Services.AddSingleton<AppShell>();

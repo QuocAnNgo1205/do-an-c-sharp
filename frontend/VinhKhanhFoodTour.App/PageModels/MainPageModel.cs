@@ -10,6 +10,8 @@ namespace VinhKhanhFoodTour.App.PageModels
     {
         private readonly ApiService _apiService;
         private readonly AudioGuideService _audioGuideService;
+        private readonly GeofenceManager _geofenceManager;
+        private readonly PoiCacheService _poiCache;
 
         [ObservableProperty]
         private ObservableCollection<Poi> restaurants = new();
@@ -22,23 +24,56 @@ namespace VinhKhanhFoodTour.App.PageModels
         [ObservableProperty] private ObservableCollection<PoiCategory> categoryData = new();
         [ObservableProperty] private List<Brush> categoryColors = new();
 
-        public MainPageModel(ApiService apiService, AudioGuideService audioGuideService)
+        public MainPageModel(ApiService apiService, AudioGuideService audioGuideService, GeofenceManager geofenceManager, PoiCacheService poiCache)
         {
             _apiService = apiService;
             _audioGuideService = audioGuideService;
+            _geofenceManager = geofenceManager;
+            _poiCache = poiCache;
+
+            // 🛑 MỚI: Đồng bộ trạng thái UI tĩnh mượt mà bất kể ai gọi (Kể cả Geofence)
+            _audioGuideService.PlaybackStateChanged += (s, e) => 
+            {
+                var poi = Restaurants.FirstOrDefault(p => p.Id == e.PoiId);
+                if (poi != null)
+                {
+                    MainThread.BeginInvokeOnMainThread(() => 
+                    {
+                        poi.IsPlaying = e.IsPlaying;
+                        if (!e.IsPlaying) poi.IsLoadingAudio = false;
+                    });
+                }
+            };
         }
 
         private async Task LoadDataAsync(string? query = null)
         {
             if (IsBusy) return;
             IsBusy = true;
-            IsRefreshing = true;
 
             try
             {
-                var data = await _apiService.GetPoisAsync();
+                // ⚡ BƯỚC 1: Đọc từ SQLite Cache ngay lập tức (không cần mạng)
+                var cached = await _poiCache.GetCachedPoisAsync();
+                if (cached.Count > 0 && string.IsNullOrWhiteSpace(query))
+                {
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        Restaurants.Clear();
+                        foreach (var item in cached) Restaurants.Add(item);
+                        UpdateChartData();
+                    });
+                    _ = UpdateDistancesAsync();
+                }
+
+                // 🌐 BƯỚC 2: Gọi API để lấy dữ liệu mới nhất (chạy ngầm)
+                IsRefreshing = true;
+                var data = await _apiService.GetPoisAsync(showErrorAlert: cached.Count == 0);
                 if (data != null)
                 {
+                    // Lưu vào cache để lần sau không cần chờ
+                    _ = _poiCache.SavePoisAsync(data);
+
                     if (!string.IsNullOrWhiteSpace(query))
                     {
                         data = data.Where(p =>
@@ -47,16 +82,13 @@ namespace VinhKhanhFoodTour.App.PageModels
                         ).ToList();
                     }
 
-                    Restaurants.Clear();
-                    foreach (var item in data)
+                    MainThread.BeginInvokeOnMainThread(() =>
                     {
-                        Restaurants.Add(item);
-                    }
-
+                        Restaurants.Clear();
+                        foreach (var item in data) Restaurants.Add(item);
+                        UpdateChartData();
+                    });
                     _ = UpdateDistancesAsync();
-                    
-                    // Cập nhật biểu đồ sau khi nạp dữ liệu xong
-                    UpdateChartData();
                 }
             }
             catch (Exception) { }
@@ -110,19 +142,19 @@ namespace VinhKhanhFoodTour.App.PageModels
         }
 
         // --- TÍNH NĂNG MỚI: THUYẾT MINH ĐỒNG BỘ ---
-        [RelayCommand]
+        [RelayCommand(AllowConcurrentExecutions = true)]
         private async Task Speak(Poi poi)
         {
             if (poi == null) return;
 
-            // Nếu đang phát chính quán này -> Dừng
+            // Nếu NHẤN KHI ĐANG PHÁT, ta Dừng
             if (poi.IsPlaying)
             {
                 await StopSpeak();
                 return;
             }
 
-            // Dừng mọi quán khác đang phát trước khi phát quán mới
+            // Nếu đang phát âm thanh khác thì Dừng tất cả cái cũ trc khi mở cái mới
             await StopSpeak();
 
             try
@@ -139,13 +171,10 @@ namespace VinhKhanhFoodTour.App.PageModels
                     }
                 }
                 
-                // PlayAudioAsync hiện đã nhận callback để đồng bộ trạng thái UI
-                // Ngôn ngữ được tự động lấy từ Preferences bên trong Service
-                await _audioGuideService.PlayAudioAsync(poi, isPlaying => 
-                {
-                    poi.IsPlaying = isPlaying;
-                    if (!isPlaying) poi.IsLoadingAudio = false;
-                });
+                // Đồng bộ bộ đếm với tính năng AutoPlay
+                _geofenceManager.RegisterManualPlay(poi.Id);
+                
+                await _audioGuideService.PlayAudioAsync(poi);
             }
             catch (Exception)
             {
@@ -153,7 +182,8 @@ namespace VinhKhanhFoodTour.App.PageModels
             }
             finally
             {
-                poi.IsLoadingAudio = false;
+                // IsLoadingAudio false should be handled by event or fallback here
+                if (!poi.IsPlaying) poi.IsLoadingAudio = false;
             }
         }
 
@@ -161,18 +191,14 @@ namespace VinhKhanhFoodTour.App.PageModels
         private async Task StopSpeak()
         {
             await _audioGuideService.StopAudioAsync();
-            
-            // Reset trạng thái hiển thị cho tất cả các quán trong danh sách
-            foreach (var r in Restaurants)
-            {
-                r.IsPlaying = false;
-                r.IsLoadingAudio = false;
-            }
         }
 
         // --- GIỮ NGUYÊN TOÀN BỘ CÁC LỆNH GỐC ---
         [RelayCommand]
-        private async Task Appearing() => await LoadDataAsync();
+        private async Task Appearing()
+        {
+            await LoadDataAsync();
+        }
 
         [RelayCommand]
         private async Task Refresh() => await LoadDataAsync();
