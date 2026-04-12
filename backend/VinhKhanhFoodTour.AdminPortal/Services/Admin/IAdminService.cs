@@ -1,4 +1,5 @@
 using VinhKhanhFoodTour.AdminPortal.Models.Auth;
+using System.ComponentModel.DataAnnotations;
 
 namespace VinhKhanhFoodTour.AdminPortal.Services.Admin;
 
@@ -31,9 +32,19 @@ public class UserActionResponseDto
 
 public class CreateUserDto
 {
+    [Required(ErrorMessage = "Tên đăng nhập là bắt buộc")]
+    [MinLength(3, ErrorMessage = "Tên đăng nhập phải có ít nhất 3 ký tự")]
     public string Username { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Email là bắt buộc")]
+    [EmailAddress(ErrorMessage = "Định dạng email không hợp lệ")]
     public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Mật khẩu là bắt buộc")]
+    [MinLength(3, ErrorMessage = "Mật khẩu phải có ít nhất 3 ký tự")]
     public string Password { get; set; } = string.Empty;
+
+    [Required]
     public string RoleName { get; set; } = "Owner";
 }
 

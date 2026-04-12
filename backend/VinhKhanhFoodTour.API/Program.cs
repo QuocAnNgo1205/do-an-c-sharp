@@ -23,9 +23,19 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 builder.Services.AddControllers();
-builder.Services.AddCors(options => {
-    options.AddPolicy("AllowAll", policy => {
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+// Cấu hình CORS - Chỉ cho phép các Web được chỉ định gọi API
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("SecurityCorsPolicy", policy =>
+    {
+        policy.WithOrigins(
+                "https://localhost:5001", // Thay bằng Port lúc chạy chạy Blazor Web của bạn
+                "http://localhost:5000",
+                "https://ten-mien-khi-deploy-cua-ban.com" // Sau này public lên mạng thì điền domain vào đây
+              )
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Rất quan trọng nếu hệ thống dùng Token/Cookie
     });
 });
 builder.Services.AddScoped<ISyncService, SyncService>();
@@ -140,11 +150,16 @@ builder.Services.AddAuthentication(options =>
 });
 
 var app = builder.Build();
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+
+// Chỉ bật Swagger khi Development — không lộ API docs trên production
+if (app.Environment.IsDevelopment())
 {
-    options.ConfigObject.PersistAuthorization = true;
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.ConfigObject.PersistAuthorization = true;
+    });
+}
 
 // Seed the database
 using (var scope = app.Services.CreateScope())
@@ -204,7 +219,7 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = ""
 });
 
-app.UseCors("AllowAll");
+app.UseCors("SecurityCorsPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();

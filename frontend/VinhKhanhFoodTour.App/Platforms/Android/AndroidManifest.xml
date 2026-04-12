@@ -23,9 +23,9 @@
         android:usesCleartextTraffic="true"
         android:label="VinhKhanhFoodTour">
 
-		<service android:name=".LocationTrackingService" 
-                 android:foregroundServiceType="location" 
-                 android:enabled="true" 
+		<service android:name=".LocationTrackingService"
+                 android:foregroundServiceType="location"
+                 android:enabled="true"
                  android:exported="false" />
 
 		<meta-data
@@ -35,6 +35,24 @@
 		<uses-library
             android:name="org.apache.http.legacy"
             android:required="false" />
+
+		<!--
+            Deep Linking: Khai báo để Android biết app này xử lý được URI dạng vkfoodtour://poi/{id}.
+            launchMode="singleTask" đảm bảo:
+              - Nếu app đang chạy ngầm → đưa lên foreground và gọi OnNewIntent()
+              - Nếu app chưa mở (cold start) → mở bình thường, intent được xử lý trong OnCreate()
+        -->
+		<activity android:name="crc64e1fb321c08285b90.MainActivity"
+		          android:exported="true"
+		          android:launchMode="singleTask">
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<!-- Khớp vkfoodtour://poi/1, vkfoodtour://poi/42, v.v. -->
+				<data android:scheme="vkfoodtour" android:host="poi" />
+			</intent-filter>
+		</activity>
 
 	</application>
 </manifest>

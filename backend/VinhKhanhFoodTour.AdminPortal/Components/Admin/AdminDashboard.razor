@@ -1,113 +1,110 @@
 @page "/admin/dashboard"
 @using VinhKhanhFoodTour.AdminPortal.Services.Admin
 @using VinhKhanhFoodTour.AdminPortal.Components.Layout
-@attribute [Authorize(Roles = "Admin")]
-
-<Notifications @ref="NotificationComponent" />
-<RejectPoiModal @ref="RejectModal" OnPoiRejected="@OnPoiRejected" />
-
-<div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
-            <p class="text-gray-600 mt-1">System status and POI approval queue</p>
-        </div>
-        <button @onclick="RefreshData" class="btn btn-secondary" disabled="@IsLoadingPois">
-            🔄 Refresh
-        </button>
-    </div>
-
-
-
-    <!-- Section 2: Pending POIs Approval Queue -->
-    <div class="card">
-        <div class="card-header">
-            <div class="flex items-center justify-between">
-                <h2 class="text-lg font-bold text-gray-800">
-                    📋 Pending POIs Approval Queue
-                </h2>
-                <span class="badge badge-warning">
-                    @(PendingPois?.Count ?? 0) Pending
-                </span>
+<ProtectedRoute RequiredRoles="Admin">
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+                <p class="text-gray-600 mt-1">System status and POI approval queue</p>
             </div>
+            <button @onclick="RefreshData" class="btn btn-secondary" disabled="@IsLoadingPois">
+                🔄 Refresh
+            </button>
         </div>
 
-        <div class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Coordinates</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (IsLoadingPois)
-                    {
+        <!-- Section 2: Pending POIs Approval Queue -->
+        <div class="card">
+            <div class="card-header">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-gray-800">
+                        📋 Pending POIs Approval Queue
+                    </h2>
+                    <span class="badge badge-warning">
+                        @(PendingPois?.Count ?? 0) Pending
+                    </span>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td colspan="4" class="text-center py-8 text-gray-500">
-                                <div class="spinner-dot mx-auto mb-3"></div>
-                                Loading pending POIs...
-                            </td>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Coordinates</th>
+                            <th>Actions</th>
                         </tr>
-                    }
-                     else if (PendingPois == null || PendingPois.Count == 0)
-                    {
-                        <tr>
-                            <td colspan="4" class="text-center py-8 text-gray-500">
-                                ✅ No pending POIs! All submissions have been reviewed.
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var poi in PendingPois.Where(p => p != null))
+                    </thead>
+                    <tbody>
+                        @if (IsLoadingPois)
                         {
                             <tr>
-                                <td>
-                                    <span class="text-xs font-mono text-gray-500">#@poi.Id</span>
-                                </td>
-                                <td>
-                                    <div class="font-medium text-gray-900">@(poi.Name ?? "N/A")</div>
-                                </td>
-                                <td>
-                                    <div class="text-sm text-gray-600">
-                                        @poi.Latitude.ToString("F4"), @poi.Longitude.ToString("F4")
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="flex gap-2">
-                                        <button 
-                                            class="btn btn-approve text-sm" 
-                                            @onclick="() => ApprovePoiAsync(poi.Id)"
-                                            disabled="@(ProcessingPoiId == poi.Id)">
-                                            @if (ProcessingPoiId == poi.Id && IsApproving)
-                                            {
-                                                <span>⏳ Đang duyệt...</span>
-                                            }
-                                            else
-                                            {
-                                                <span>✅ Duyệt</span>
-                                            }
-                                        </button>
-                                        <button 
-                                            class="btn btn-reject text-sm" 
-                                            @onclick="() => ShowRejectModal(poi)"
-                                            disabled="@(ProcessingPoiId == poi.Id)">
-                                            ❌ Từ chối
-                                        </button>
-                                    </div>
+                                <td colspan="4" class="text-center py-8 text-gray-500">
+                                    <div class="spinner-dot mx-auto mb-3"></div>
+                                    Loading pending POIs...
                                 </td>
                             </tr>
                         }
-                    }
-                </tbody>
-            </table>
+                         else if (PendingPois == null || PendingPois.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-8 text-gray-500">
+                                    ✅ No pending POIs! All submissions have been reviewed.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var poi in PendingPois.Where(p => p != null))
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="text-xs font-mono text-gray-500">#@poi.Id</span>
+                                    </td>
+                                    <td>
+                                        <div class="font-medium text-gray-900">@(poi.Name ?? "N/A")</div>
+                                    </td>
+                                    <td>
+                                        <div class="text-sm text-gray-600">
+                                            @poi.Latitude.ToString("F4"), @poi.Longitude.ToString("F4")
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="flex gap-2">
+                                            <button 
+                                                class="btn btn-approve text-sm" 
+                                                @onclick="() => ApprovePoiAsync(poi.Id)"
+                                                disabled="@(ProcessingPoiId == poi.Id)">
+                                                @if (ProcessingPoiId == poi.Id && IsApproving)
+                                                {
+                                                    <span>⏳ Đang duyệt...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>✅ Duyệt</span>
+                                                }
+                                            </button>
+                                            <button 
+                                                class="btn btn-reject text-sm" 
+                                                @onclick="() => ShowRejectModal(poi)"
+                                                disabled="@(ProcessingPoiId == poi.Id)">
+                                                ❌ Từ chối
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
+        <Notifications @ref="NotificationComponent" />
+        <RejectPoiModal @ref="RejectModal" OnPoiRejected="@OnPoiRejected" />
     </div>
-</div>
+</ProtectedRoute>
 
 @code {
     [Inject]

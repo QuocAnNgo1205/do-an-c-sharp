@@ -14,13 +14,29 @@ namespace VinhKhanhFoodTour.Data
             // 2. Tạo Role
             var adminRole = new Role { RoleName = "Admin" };
             var ownerRole = new Role { RoleName = "Owner" };
-            context.Roles.AddRange(adminRole, ownerRole);
+            var touristRole = new Role { RoleName = "Tourist" };
+            context.Roles.AddRange(adminRole, ownerRole, touristRole);
             context.SaveChanges();
 
-            // 3. Tạo User
-            var adminUser = new User { Username = "admin", PasswordHash = "123", RoleId = adminRole.Id };
-            var ownerOanhUser = new User { Username = "owner_oanh", PasswordHash = "123", RoleId = ownerRole.Id };
-            var ownerVuUser = new User { Username = "owner_vu", PasswordHash = "123", RoleId = ownerRole.Id };
+            // 3. Tạo User (Hash mật khẩu bằng BCrypt để khớp với logic Auth mới)
+            var adminUser = new User 
+            { 
+                Username = "admin", 
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("123"), 
+                RoleId = adminRole.Id 
+            };
+            var ownerOanhUser = new User 
+            { 
+                Username = "owner_oanh", 
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("123"), 
+                RoleId = ownerRole.Id 
+            };
+            var ownerVuUser = new User 
+            { 
+                Username = "owner_vu", 
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("123"), 
+                RoleId = ownerRole.Id 
+            };
 
             context.Users.AddRange(adminUser, ownerOanhUser, ownerVuUser);
             context.SaveChanges();

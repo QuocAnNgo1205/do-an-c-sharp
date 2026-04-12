@@ -12,7 +12,7 @@ using VinhKhanhFoodTour.AdminPortal.Services.Auth;
 
 namespace VinhKhanhFoodTour.AdminPortal.Services.Http;
 
-public class ApiClient : IDisposable
+public class ApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILocalStorageService _localStorage;
@@ -20,24 +20,27 @@ public class ApiClient : IDisposable
     private readonly NavigationManager _navigationManager;
     private readonly ILogger<ApiClient> _logger;
 
-    private const string BaseUrl = "http://localhost:5007";
     private const string AuthTokenKey = "authToken";
     private const string AuthUserKey = "authUser";
 
     public ApiClient(
+        HttpClient httpClient,
         ILocalStorageService localStorage,
         AuthState authState,
         NavigationManager navigationManager,
         ILogger<ApiClient> logger)
     {
+        _httpClient = httpClient;
         _localStorage = localStorage;
         _authState = authState;
         _navigationManager = navigationManager;
         _logger = logger;
 
-        _httpClient = new HttpClient();
-        _httpClient.BaseAddress = new Uri(BaseUrl);
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "VinhKhanhFoodTour.AdminPortal");
+        // Lưu ý: BaseAddress đã được cấu hình trong Program.cs qua builder.Services.AddHttpClient<ApiClient>
+        if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+        {
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "VinhKhanhFoodTour.AdminPortal");
+        }
     }
 
     /// <summary>
@@ -250,8 +253,4 @@ public class ApiClient : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _httpClient?.Dispose();
-    }
 }

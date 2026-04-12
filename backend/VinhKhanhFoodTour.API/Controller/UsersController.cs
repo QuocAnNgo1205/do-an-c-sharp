@@ -91,12 +91,12 @@ namespace VinhKhanhFoodTour.API.Controller
                 return BadRequest(new { Message = $"Không tìm thấy Role '{request.RoleName}'" });
             }
 
-            // 3. Tạo User
+            // 3. Tạo User, băm mật khẩu bằng BCrypt (giống luồng Register thông thường)
             var user = new VinhKhanhFoodTour.Models.User
             {
                 Username = request.Username,
                 Email = request.Email,
-                PasswordHash = request.Password, // Theo logic hiện tại của hệ thống
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // PHẢI hash!
                 RoleId = role.Id,
                 IsActive = true,
                 PreferredLanguage = "vi"

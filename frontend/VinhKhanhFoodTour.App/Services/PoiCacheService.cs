@@ -15,29 +15,43 @@ public class PoiCacheService
 {
     private const string TABLE_POI = "CachePoi";
     private bool _initialized = false;
+    private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
 
     private async Task EnsureInitializedAsync()
     {
+        // Kiểm tra nhanh trước khi tranh lầy lock (tối ưu hoá)
         if (_initialized) return;
-        await using var conn = new SqliteConnection(Constants.DatabasePath);
-        await conn.OpenAsync();
 
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = $@"
-            CREATE TABLE IF NOT EXISTS {TABLE_POI} (
-                Id          INTEGER PRIMARY KEY,
-                Name        TEXT NOT NULL,
-                Title       TEXT,
-                Description TEXT,
-                Latitude    REAL,
-                Longitude   REAL,
-                ImageUrl    TEXT,
-                Status      INTEGER,
-                TranslationsJson TEXT
-            );";
-        await cmd.ExecuteNonQueryAsync();
-        _initialized = true;
-        Debug.WriteLine("[PoiCache] 🗄️ SQLite table ready.");
+        await _initLock.WaitAsync();
+        try
+        {
+            // Double-check sau khi có lock — tránh race condition
+            if (_initialized) return;
+
+            await using var conn = new SqliteConnection(Constants.DatabasePath);
+            await conn.OpenAsync();
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = $@"
+                CREATE TABLE IF NOT EXISTS {TABLE_POI} (
+                    Id          INTEGER PRIMARY KEY,
+                    Name        TEXT NOT NULL,
+                    Title       TEXT,
+                    Description TEXT,
+                    Latitude    REAL,
+                    Longitude   REAL,
+                    ImageUrl    TEXT,
+                    Status      INTEGER,
+                    TranslationsJson TEXT
+                );";
+            await cmd.ExecuteNonQueryAsync();
+            _initialized = true;
+            Debug.WriteLine("[PoiCache] 🗄️ SQLite table ready.");
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
     /// <summary>

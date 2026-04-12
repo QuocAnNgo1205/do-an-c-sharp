@@ -103,6 +103,11 @@
                                                 @onclick="() => EditPoi(poi)">
                                             ✏️ Edit
                                         </button>
+                                        <button class="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                                                title="Tạo QR Code cho món ăn / quán này"
+                                                @onclick="() => ShowQrModal(poi)">
+                                            📱 QR
+                                        </button>
                                         <button class="text-red-600 hover:text-red-800 text-sm font-medium" 
                                                 @onclick="() => DeletePoi(poi)">
                                             🗑️ Delete
@@ -170,6 +175,12 @@
                   ParentNotifications="@NotificationComponent" />
 }
 
+<!-- QR Code Modal -->
+<QrCodeModal IsOpen="@IsQrModalOpen"
+             PoiId="@QrPoiId"
+             PoiName="@QrPoiName"
+             OnClose="HandleQrModalClose" />
+
 @code {
     [Inject]
     private IPoiService? PoiService { get; set; }
@@ -184,6 +195,11 @@
     private bool IsLoading = true;
     private bool IsLoadingStats = true;
     private bool _isInitialized = false;
+
+    // --- QR Code Modal State ---
+    private bool IsQrModalOpen = false;
+    private int QrPoiId = 0;
+    private string QrPoiName = string.Empty;
 
     [Inject]
     private IJSRuntime? JS { get; set; }
@@ -333,6 +349,21 @@
     {
         IsEditModalOpen = false;
         SelectedPoiId = 0;
+    }
+
+    // --- QR Code Modal Handlers ---
+    private void ShowQrModal(VinhKhanhFoodTour.AdminPortal.Services.Owner.PoiDto poi)
+    {
+        QrPoiId = (int)poi.Id;
+        QrPoiName = poi.Name ?? "Quán ăn";
+        IsQrModalOpen = true;
+    }
+
+    private void HandleQrModalClose()
+    {
+        IsQrModalOpen = false;
+        QrPoiId = 0;
+        QrPoiName = string.Empty;
     }
 
     private async Task HandlePoiUpdated()

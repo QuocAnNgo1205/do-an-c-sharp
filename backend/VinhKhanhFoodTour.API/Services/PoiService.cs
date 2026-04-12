@@ -26,6 +26,28 @@ namespace VinhKhanhFoodTour.API.Services
             return $"{request.Scheme}://{request.Host}{request.PathBase}";
         }
 
+        /// <summary>
+        /// Xóa file an toàn: chỉ xóa nếu đường dẫn thực sự nằm TRONG wwwroot.
+        /// Chống lỗ hổng Path Traversal (ví dụ: ../../appsettings.json).
+        /// </summary>
+        private void SafeDeleteFile(string? relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath)) return;
+
+            var wwwroot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"));
+            var fullPath = Path.GetFullPath(Path.Combine(wwwroot, relativePath.TrimStart('/', '\\')));
+
+            // Bảo vệ: đường dẫn phải nằm TRONG wwwroot
+            if (!fullPath.StartsWith(wwwroot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[SECURITY] Path traversal attempt blocked: '{relativePath}' resolved to '{fullPath}'");
+                return;
+            }
+
+            if (File.Exists(fullPath))
+                File.Delete(fullPath);
+        }
+
         public async Task<Poi> CreatePoiAsync(int ownerId, CreatePoiRequest request)
         {
             var location = SpatialHelper.CreatePoint(request.Latitude, request.Longitude);
@@ -62,6 +84,7 @@ namespace VinhKhanhFoodTour.API.Services
         {
             var baseUrl = GetBaseUrl();
             return await _context.Pois
+                .Include(p => p.Translations)
                 .Where(p => p.Status == PoiStatus.Pending)
                 .Select(ToPoiDto(baseUrl))
                 .ToListAsync();
@@ -146,12 +169,8 @@ namespace VinhKhanhFoodTour.API.Services
 
             if (!string.IsNullOrEmpty(imageUrl))
             {
-                // Xóa ảnh cũ nếu có
-                if (!string.IsNullOrEmpty(poi.ImageUrl))
-                {
-                    var oldPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", poi.ImageUrl.TrimStart('/'));
-                    if (File.Exists(oldPath)) File.Delete(oldPath);
-                }
+                // Xóa ảnh cũ nếu có (an toàn, chống Path Traversal)
+                SafeDeleteFile(poi.ImageUrl);
                 poi.ImageUrl = imageUrl;
             }
 
@@ -185,25 +204,13 @@ namespace VinhKhanhFoodTour.API.Services
                 throw new UnauthorizedAccessException("Bạn không có quyền xóa quán này.");
             }
 
-            // 🔴 Xóa file vật lý
-            if (!string.IsNullOrEmpty(poi.ImageUrl))
-            {
-                var mainImagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", poi.ImageUrl.TrimStart('/'));
-                if (File.Exists(mainImagePath)) File.Delete(mainImagePath);
-            }
+            // Xóa file vật lý (an toàn, chống Path Traversal)
+            SafeDeleteFile(poi.ImageUrl);
 
             foreach (var trans in poi.Translations)
             {
-                if (!string.IsNullOrEmpty(trans.AudioFilePath))
-                {
-                    var audioPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", trans.AudioFilePath.TrimStart('/'));
-                    if (File.Exists(audioPath)) File.Delete(audioPath);
-                }
-                if (!string.IsNullOrEmpty(trans.ImageUrl))
-                {
-                    var transImagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", trans.ImageUrl.TrimStart('/'));
-                    if (File.Exists(transImagePath)) File.Delete(transImagePath);
-                }
+                SafeDeleteFile(trans.AudioFilePath);
+                SafeDeleteFile(trans.ImageUrl);
             }
 
             _context.Pois.Remove(poi);
@@ -254,6 +261,7 @@ namespace VinhKhanhFoodTour.API.Services
         {
             var baseUrl = GetBaseUrl();
             return await _context.Pois
+                .Include(p => p.Translations)
                 .Where(p => p.OwnerId == ownerId)
                 .Select(ToPoiDto(baseUrl))
                 .ToListAsync();
@@ -263,6 +271,7 @@ namespace VinhKhanhFoodTour.API.Services
         {
             var baseUrl = GetBaseUrl();
             return await _context.Pois
+                .Include(p => p.Translations)
                 .Where(p => p.Status == PoiStatus.Approved)
                 .Select(ToPoiDto(baseUrl))
                 .ToListAsync();

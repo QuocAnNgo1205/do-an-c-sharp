@@ -98,34 +98,50 @@ namespace VinhKhanhFoodTour.App.Services
                     // Ghi sổ ngay lập tức để block các call tiếp theo
                     _lastPlayedPois[closestPoi.Id] = DateTime.UtcNow;
 
-                    MainThread.BeginInvokeOnMainThread(async () => 
+                    if (closestPoi.Translations != null && closestPoi.Translations.Count > 0)
                     {
-                        try 
+                        // Cache đã có Translations — phát ngay, không cần gọi API
+                        Debug.WriteLine($"[Geofence] 🎯 TRIGGERING AUDIO FOR: {closestPoi.Name} (Offline Mode: OK)");
+                        MainThread.BeginInvokeOnMainThread(async () =>
                         {
-                            // VI DIỆU: Offline-Ready tuyệt đối!
-                            // Các POI tải từ SQLite Cache ĐÃ BAO GỒM sẵn Translations!
-                            // Nên chúng ta KHÔNG CẦN GỌI API API Detail nữa mà phát NGAY LẬP TỨC!
-                            if (closestPoi.Translations != null && closestPoi.Translations.Count > 0)
+                            try
                             {
-                                Debug.WriteLine($"[Geofence] 🎯 TRIGGERING AUDIO FOR: {closestPoi.Name} (Offline Mode: OK)");
                                 await _audioService.PlayAudioAsync(closestPoi, showErrors: false);
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                // Nếu vì lý do nào đó cache bị rỗng dịch thuật, thử fallback API ngầm
-                                var detail = await _apiService.GetPoiDetailAsync(closestPoi.Id, showErrorAlert: false);
-                                if (detail != null)
+                                Debug.WriteLine($"[Geofence THREAD ERROR] {ex.Message}");
+                            }
+                        });
+                    }
+                    else
+                    {
+                        // Fallback: gọi API từ BACKGROUND THREAD (đây là context hiện tại),
+                        // sau đó mới vào Main Thread để phát audio — KHÔNG block UI.
+                        try
+                        {
+                            var detail = await _apiService.GetPoiDetailAsync(closestPoi.Id, showErrorAlert: false);
+                            if (detail != null)
+                            {
+                                Debug.WriteLine($"[Geofence] 🎯 TRIGGERING AUDIO FOR: {detail.Name} (Fallback API)");
+                                MainThread.BeginInvokeOnMainThread(async () =>
                                 {
-                                    Debug.WriteLine($"[Geofence] 🎯 TRIGGERING AUDIO FOR: {detail.Name} (Fallback API)");
-                                    await _audioService.PlayAudioAsync(detail, showErrors: false);
-                                }
+                                    try
+                                    {
+                                        await _audioService.PlayAudioAsync(detail, showErrors: false);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"[Geofence THREAD ERROR] {ex.Message}");
+                                    }
+                                });
                             }
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"[Geofence THREAD ERROR] {ex.Message}");
+                            Debug.WriteLine($"[Geofence API Fallback ERROR] {ex.Message}");
                         }
-                    });
+                    }
                 }
             }
             catch (Exception ex)

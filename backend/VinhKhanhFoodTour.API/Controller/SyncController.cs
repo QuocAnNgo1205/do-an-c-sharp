@@ -35,25 +35,14 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                // Query the Pois table for all Approved POIs
-                var approvedPois = await _context.Pois
+                // Tính MAX(LastUpdated) trực tiếp trên DB — không load toàn bộ entity vào RAM
+                var maxLastUpdated = await _context.Pois
                     .Where(p => p.Status == PoiStatus.Approved)
-                    .ToListAsync();
+                    .MaxAsync(p => (DateTime?)p.LastUpdated);
 
-                string versionString;
-
-                if (approvedPois.Count == 0)
-                {
-                    // If there are no approved POIs, return default version
-                    versionString = "1.0.0";
-                }
-                else
-                {
-                    // Find the maximum LastUpdated DateTime
-                    var maxLastUpdated = approvedPois.Max(p => p.LastUpdated);
-                    // Format as "yyyyMMddHHmmss"
-                    versionString = maxLastUpdated.ToString("yyyyMMddHHmmss");
-                }
+                string versionString = maxLastUpdated.HasValue
+                    ? maxLastUpdated.Value.ToString("yyyyMMddHHmmss")
+                    : "1.0.0";
 
                 return Ok(new { version = versionString });
             }
@@ -163,7 +152,7 @@ namespace VinhKhanhFoodTour.API.Controllers
             return Ok(status);
         }
 
-        [HttpPost("sync/logs")]
+        [HttpPost("logs")]
         [AllowAnonymous]
         public async Task<IActionResult> CreateNarrationLog([FromBody] NarrationLogRequestDto request)
         {

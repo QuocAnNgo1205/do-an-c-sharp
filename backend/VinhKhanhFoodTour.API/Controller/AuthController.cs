@@ -34,22 +34,20 @@ namespace VinhKhanhFoodTour.API.Controllers
                 return Unauthorized(new { Message = "Sai tài khoản hoặc mật khẩu!" });
             }
 
-            // Kiểm tra mật khẩu bằng BCrypt, HOẶC hỗ trợ fallback nếu mk cũ là PlainText
-            bool isPasswordCorrect = false;
+            // Kiểm tra mật khẩu bằng BCrypt
+            bool isPasswordCorrect;
             try
             {
                 isPasswordCorrect = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
             }
-            catch 
+            catch
             {
-                // Nếu PasswordHash không phải là mã BCrypt hợp lệ (VD: user tự seed tay là "0", "1")
-                isPasswordCorrect = (user.PasswordHash == request.Password);
+                // Hash không phải BCrypt format (ví dụ: user seed tay) — từ chối, không fallback plaintext
+                isPasswordCorrect = false;
             }
 
-            if (!isPasswordCorrect && user.PasswordHash != request.Password)
+            if (!isPasswordCorrect)
             {
-                // Trường hợp BCrypt ném Exception ở trên nhưng phép gán cuối vẫn Fail
-                // Hoặc BCrypt không throw Exception nhưng Verify() trả về false, ta cho phép kiểm tra fallback thêm lần nữa cho an toàn.
                 return Unauthorized(new { Message = "Sai tài khoản hoặc mật khẩu!" });
             }
 
@@ -98,13 +96,11 @@ namespace VinhKhanhFoodTour.API.Controllers
                 return BadRequest(new { Message = "Email đã tồn tại!" });
             }
 
-            // 2. Xác định Role (Mặc định là Tourist cho Mobile App)
-            string roleToAssign = string.IsNullOrEmpty(request.Role) ? "Tourist" : request.Role;
-            var role = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == roleToAssign);
-            
+            // 2. Gán Role "Owner" cho đăng ký qua Web Portal.
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Owner");
             if (role == null)
             {
-                return BadRequest(new { Message = $"Lỗi hệ thống: Không tìm thấy Role {roleToAssign}!" });
+                return BadRequest(new { Message = "Lỗi hệ thống: Không tìm thấy Role Owner!" });
             }
 
             // 3. Tạo mã băm cho Mật Khẩu (Bảo mật)
@@ -140,6 +136,6 @@ namespace VinhKhanhFoodTour.API.Controllers
         public string Username { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string Password { get; set; } = null!;
-        public string? Role { get; set; } // "Owner", "Tourist", v.v.
+        // Role không được nhận từ client — luôn gán Tourist bởi server
     }
 }

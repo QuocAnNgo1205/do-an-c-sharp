@@ -1,0 +1,154 @@
+@using QRCoder
+@inject IJSRuntime JS
+
+@if (IsOpen)
+{
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-50 flex items-center justify-center"
+         @onclick="HandleBackdropClick">
+
+        <!-- Modal Card -->
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+             @onclick:stopPropagation="true">
+
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-white text-lg font-bold">📱 QR Code</h2>
+                    <p class="text-indigo-200 text-xs mt-0.5 truncate max-w-[220px]">@PoiName</p>
+                </div>
+                <button @onclick="Close"
+                        class="text-white hover:text-indigo-200 transition-colors text-2xl leading-none">
+                    &times;
+                </button>
+            </div>
+
+            <!-- QR Image -->
+            <div class="p-6 flex flex-col items-center gap-4">
+                @if (_isGenerating)
+                {
+                    <div class="w-56 h-56 flex items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                        <div class="text-center text-gray-400">
+                            <div class="text-3xl mb-2">⏳</div>
+                            <p class="text-sm">Đang tạo mã QR...</p>
+                        </div>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(_qrBase64))
+                {
+                    <!-- White border frame giúp máy quét nhận diện tốt hơn -->
+                    <div class="p-3 bg-white rounded-xl shadow-md border border-gray-100">
+                        <img src="data:image/png;base64,@_qrBase64"
+                             alt="QR Code cho @PoiName"
+                             class="w-52 h-52 block" />
+                    </div>
+
+                    <!-- Deep Link URI hiển thị để debug / copy -->
+                    <p class="text-xs text-gray-400 font-mono bg-gray-50 px-3 py-1.5 rounded-lg break-all text-center">
+                        @_deepLinkUri
+                    </p>
+                }
+                else
+                {
+                    <div class="w-56 h-56 flex items-center justify-center bg-red-50 rounded-xl border-2 border-dashed border-red-200">
+                        <p class="text-red-500 text-sm text-center px-4">Không thể tạo mã QR. Vui lòng thử lại.</p>
+                    </div>
+                }
+
+                <!-- Action buttons -->
+                <div class="flex gap-3 w-full mt-2">
+                    <button @onclick="Close"
+                            class="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">
+                        Đóng
+                    </button>
+                    @if (!string.IsNullOrEmpty(_qrBase64))
+                    {
+                        <button @onclick="DownloadQrCode"
+                                class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                            ⬇️ Tải xuống
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public int PoiId { get; set; }
+    [Parameter] public string PoiName { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string _qrBase64 = string.Empty;
+    private string _deepLinkUri = string.Empty;
+    private bool _isGenerating = false;
+
+    // Mỗi khi IsOpen chuyển sang true, tạo lại QR
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && PoiId > 0 && string.IsNullOrEmpty(_qrBase64))
+        {
+            await GenerateQrCodeAsync();
+        }
+
+        // Reset khi đóng để lần sau tạo mới nếu PoiId khác
+        if (!IsOpen)
+        {
+            _qrBase64 = string.Empty;
+        }
+    }
+
+    private Task GenerateQrCodeAsync()
+    {
+        _isGenerating = true;
+        _deepLinkUri = $"vkfoodtour://poi/{PoiId}";
+
+        try
+        {
+            // Dùng QRCoder tạo QR từ deep link URI
+            using var qrGenerator = new QRCodeGenerator();
+            using var qrCodeData = qrGenerator.CreateQrCode(_deepLinkUri, QRCodeGenerator.ECCLevel.M);
+            using var qrCode = new PngByteQRCode(qrCodeData);
+
+            // pixelsPerModule=10 → ảnh 250x250 pixel, đủ to để in
+            var pngBytes = qrCode.GetGraphic(pixelsPerModule: 10);
+            _qrBase64 = Convert.ToBase64String(pngBytes);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[QrCodeModal] Error generating QR: {ex.Message}");
+            _qrBase64 = string.Empty;
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task DownloadQrCode()
+    {
+        if (string.IsNullOrEmpty(_qrBase64)) return;
+
+        // Tên file an toàn: bỏ ký tự đặc biệt
+        var safeName = System.Text.RegularExpressions.Regex
+            .Replace(PoiName, @"[^\w\d\s]", "")
+            .Trim()
+            .Replace(" ", "_");
+
+        var fileName = $"QR_{safeName}_{PoiId}.png";
+
+        // Gọi JavaScript để trigger download
+        await JS.InvokeVoidAsync("downloadBase64File", _qrBase64, fileName, "image/png");
+    }
+
+    private async Task HandleBackdropClick() => await Close();
+
+    private async Task Close()
+    {
+        _qrBase64 = string.Empty; // Reset để tạo lại khi mở lần sau (nếu POI khác)
+        await OnClose.InvokeAsync();
+    }
+}

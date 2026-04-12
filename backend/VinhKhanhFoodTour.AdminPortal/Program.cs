@@ -5,30 +5,50 @@ using VinhKhanhFoodTour.AdminPortal.Services.Owner;
 using VinhKhanhFoodTour.AdminPortal.Services.Admin;
 using VinhKhanhFoodTour.AdminPortal.Services.Common;
 using Blazored.LocalStorage;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// 1. Add Blazor services
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = true);
 
-// Register LocalStorage
+// 2. Add 3rd party libraries
 builder.Services.AddBlazoredLocalStorage();
+// Cấu hình CORS - Chỉ cho phép các Web được chỉ định gọi API
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("SecurityCorsPolicy", policy =>
+    {
+        policy.WithOrigins(
+                "https://localhost:5001", // Thay bằng Port lúc chạy chạy Blazor Web của bạn
+                "http://localhost:5000",
+                "https://ten-mien-khi-deploy-cua-ban.com" // Sau này public lên mạng thì điền domain vào đây
+              )
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Rất quan trọng nếu hệ thống dùng Token/Cookie
+    });
+});
+// 3. Configure HTTP Client (Chuẩn Production)
+builder.Services.AddHttpClient<ApiClient>(client =>
+{
+    // Lấy URL từ appsettings.json hoặc set cứng khi dev
+    client.BaseAddress = new Uri(builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000/");
+});
 
-// Register HTTP Client and Services
-builder.Services.AddScoped<ApiClient>();
-builder.Services.AddScoped<AuthService>();
+// 4. Configure Application State
+// AuthState là custom state manager (KHÔNG phải ASP.NET Core AuthenticationStateProvider)
+// Dùng AddScoped để mỗi Blazor circuit có một instance riêng
 builder.Services.AddScoped<AuthState>();
+builder.Services.AddScoped<AuthService>();
+
+// 5. Configure Business Services
 builder.Services.AddScoped<IPoiService, PoiService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
-
 builder.Services.AddScoped<ITranslationService, TranslationService>();
 
-// Configure logging
+// 6. Configure logging
 builder.Services.AddLogging(config =>
 {
     config.AddConsole();
@@ -41,15 +61,16 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+
+app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseHttpsRedirection();
 
+app.UseStaticFiles(); // Đổi lại dùng UseStaticFiles nếu bị lỗi ở MapStaticAssets
 app.UseAntiforgery();
+app.UseCors("SecurityCorsPolicy");
 
-app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
