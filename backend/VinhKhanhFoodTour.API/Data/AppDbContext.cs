@@ -15,6 +15,7 @@ namespace VinhKhanhFoodTour.Data
         public DbSet<Poi> Pois { get; set; } = null!;
         public DbSet<PoiTranslation> PoiTranslations { get; set; } = null!;
         public DbSet<NarrationLog> NarrationLogs { get; set; } = null!;
+        public DbSet<QrScanLog> QrScanLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -99,6 +100,15 @@ namespace VinhKhanhFoodTour.Data
                 entity.Property(nl => nl.PoiId).IsRequired();
                 entity.Property(nl => nl.DeviceId).IsRequired().HasMaxLength(255);
                 entity.Property(nl => nl.Timestamp).HasDefaultValueSql("GETUTCDATE()");
+            });
+
+            // ============== QrScanLog Configuration ==============
+            modelBuilder.Entity<QrScanLog>(entity =>
+            {
+                entity.HasKey(q => q.Id);
+                entity.Property(q => q.PoiId).IsRequired();
+                entity.Property(q => q.DeviceId).IsRequired().HasMaxLength(255);
+                entity.Property(q => q.Timestamp).HasDefaultValueSql("GETUTCDATE()");
             });
         }
     }

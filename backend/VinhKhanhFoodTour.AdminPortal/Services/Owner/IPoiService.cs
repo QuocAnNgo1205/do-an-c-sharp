@@ -25,9 +25,19 @@ public interface IPoiService
     Task<MediaUploadResponseDto> UploadMediaAsync(int poiId, string languageCode, MultipartFormDataContent content);
 
     /// <summary>
-    /// Get listen statistics for owner's POIs
+    /// Get listen/scan statistics for owner's POIs
     /// </summary>
-    Task<List<PoiListenStatsDto>> GetListenStatsAsync();
+    Task<List<PoiListenStatsDto>> GetListenStatsAsync(string mode = "listen");
+
+    /// <summary>
+    /// Get trend statistics (by day or month, listen or scan)
+    /// </summary>
+    Task<List<ListenTrendDto>> GetListenTrendAsync(string type, string mode = "listen");
+
+    /// <summary>
+    /// Lấy danh sách PIN toàn cảnh bản đồ
+    /// </summary>
+    Task<List<OverviewMapPinDto>> GetOverviewMapPinsAsync();
 
     /// <summary>
     /// Get public POI details by ID
@@ -67,7 +77,7 @@ public class PoiDto
 public class PoiTranslationDto
 {
     public long Id { get; set; }
-    public string Language { get; set; } = string.Empty;
+    public string LanguageCode { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string? NarrationUrl { get; set; }
@@ -93,6 +103,12 @@ public class PoiListenStatsDto
     public int ListenCount { get; set; }
 }
 
+public class ListenTrendDto
+{
+    public string Label { get; set; } = string.Empty;
+    public int ListenCount { get; set; }
+}
+
 public class CreatePoiDto
 {
     public string Name { get; set; } = string.Empty;
@@ -100,4 +116,15 @@ public class CreatePoiDto
     public double Longitude { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+}
+
+public class OverviewMapPinDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public int Status { get; set; }
+    public int OwnerId { get; set; }
+    public int ListenCount { get; set; }
 }

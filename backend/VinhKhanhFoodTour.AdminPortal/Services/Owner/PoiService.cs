@@ -102,17 +102,31 @@ public class PoiService : IPoiService
         }
     }
 
-    public async Task<List<PoiListenStatsDto>> GetListenStatsAsync()
+    public async Task<List<PoiListenStatsDto>> GetListenStatsAsync(string mode = "listen")
     {
         try
         {
-            var result = await _apiClient.GetAsync<List<PoiListenStatsDto>>("api/v1/Sync/owner/stats/listens");
+            var result = await _apiClient.GetAsync<List<PoiListenStatsDto>>($"api/v1/Sync/owner/stats/listens?mode={mode}");
             return result ?? new List<PoiListenStatsDto>();
         }
         catch (Exception ex)
         {
             _logger.LogError($"Error fetching listen stats: {ex.Message}");
             throw;
+        }
+    }
+
+    public async Task<List<ListenTrendDto>> GetListenTrendAsync(string type, string mode = "listen")
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<ListenTrendDto>>($"api/v1/Sync/owner/stats/listens/trend?type={type}&mode={mode}");
+            return result ?? new List<ListenTrendDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching listen trend: {ex.Message}");
+            return new List<ListenTrendDto>();
         }
     }
 
@@ -153,6 +167,20 @@ public class PoiService : IPoiService
         {
             _logger.LogError($"Error updating POI {id}: {ex.Message}");
             return false;
+        }
+    }
+
+    public async Task<List<OverviewMapPinDto>> GetOverviewMapPinsAsync()
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<OverviewMapPinDto>>("api/v1/Poi/overview-pins");
+            return result ?? new List<OverviewMapPinDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching overview map pins: {ex.Message}");
+            return new List<OverviewMapPinDto>();
         }
     }
 

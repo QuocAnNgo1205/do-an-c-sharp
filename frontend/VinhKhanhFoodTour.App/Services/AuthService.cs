@@ -56,6 +56,44 @@ public class AuthService
         }
     }
 
+    public async Task<(bool Success, string Message)> GuestLoginAsync(string deviceId)
+    {
+        try
+        {
+            var loginData = new { DeviceId = deviceId };
+            var response = await _httpClient.PostAsJsonAsync("Auth/guest-login", loginData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+                if (result != null && !string.IsNullOrEmpty(result.Token))
+                {
+                    // 🔐 Lưu Token vào SecureStorage
+                    await SecureStorage.SetAsync("jwt_token", result.Token);
+                    await SecureStorage.SetAsync("user_name", result.Username);
+                    await SecureStorage.SetAsync("user_role", result.Role);
+                    await SecureStorage.SetAsync("token_expiration", result.Expiration.HasValue ? result.Expiration.Value.ToString("o") : DateTime.UtcNow.AddDays(365).ToString("o"));
+
+                    // 🌍 PHỤC HỒI NGÔN NGỮ (Mặc định 'vi')
+                    var userLang = Preferences.Default.Get($"PreferredLanguage_{result.Username}", "vi");
+                    Preferences.Default.Set("PreferredLanguage", userLang);
+
+                    Debug.WriteLine("[Auth] Guest Login successful, token saved.");
+                    return (true, "Đăng nhập Guest thành công!");
+                }
+            }
+
+            var error = await response.Content.ReadAsStringAsync();
+            Debug.WriteLine($"[Auth] Guest Login failed: {error}");
+            return (false, "Không thể tạo tài khoản Guest.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Auth] Guest Login exception: {ex.Message}");
+            return (false, "Lỗi kết nối máy chủ. Vui lòng thử lại sau.");
+        }
+    }
+
     public async Task<(bool Success, string Message)> RegisterAsync(string username, string email, string password)
     {
         try

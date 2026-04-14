@@ -19,10 +19,6 @@
         <ShellContent ContentTemplate="{DataTemplate pages:SplashPage}" />
     </ShellItem>
 
-    <!-- 🔐 LUỒNG AUTH: LoginPage (Ẩn khỏi TabBar) -->
-    <ShellItem Route="LoginPage" FlyoutItemIsVisible="False">
-        <ShellContent ContentTemplate="{DataTemplate pages:LoginPage}" />
-    </ShellItem>
 
     <TabBar>
         <Tab Title="Địa điểm" Icon="icon_list.png">

@@ -1,0 +1,109 @@
+@page "/poi-map"
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@inject IPoiService PoiService
+@inject IJSRuntime JSRuntime
+
+<ProtectedRoute RequiredRoles="Admin,Owner">
+    <div class="h-full flex flex-col space-y-4">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Bản Đồ Quán Ăn</h1>
+                <p class="text-gray-600 mt-1">Quan sát trực quan toàn bộ vị trí các Point of Interest.</p>
+            </div>
+            
+            <div class="flex gap-4 items-center">
+                <!-- Map Mode Toggle -->
+                <div class="flex bg-gray-200 rounded-lg p-1">
+                    <button class="@(MapMode == "Pin" ? "bg-white shadow-sm font-medium text-gray-800" : "text-gray-500 hover:text-gray-700") px-4 py-1.5 rounded-md text-sm transition-all"
+                            @onclick='() => ChangeMapMode("Pin")'>
+                        📍 Bản đồ Ghim
+                    </button>
+                    <button class="@(MapMode == "Heatmap" ? "bg-white shadow-sm font-medium text-orange-600" : "text-gray-500 hover:text-gray-700") px-4 py-1.5 rounded-md text-sm transition-all flex items-center gap-1"
+                            @onclick='() => ChangeMapMode("Heatmap")'>
+                        🔥 Bản đồ Nhiệt (Lượt nghe)
+                    </button>
+                </div>
+
+                <!-- Legends cho Bản đồ Ghim -->
+                <div class="flex gap-2 items-center text-sm font-medium @(MapMode == "Heatmap" ? "hidden" : "")">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500"></span> Đã duyệt</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-orange-500"></span> Chờ duyệt</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-red-600"></span> Từ chối</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div class="card flex-1 min-h-[600px] flex flex-col p-0 overflow-hidden relative">
+            @if (IsLoading)
+            {
+                <div class="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+                    <div class="spinner-dot"></div>
+                    <p class="mt-4 text-gray-600 font-medium">Đang tải bản đồ...</p>
+                </div>
+            }
+
+            <div id="overview-map" class="w-full h-full min-h-[600px] z-10"></div>
+        </div>
+    </div>
+</ProtectedRoute>
+
+@code {
+    private bool IsLoading = true;
+    private List<OverviewMapPinDto> Pins = new();
+    private bool _isMapInitialized = false;
+    private string MapMode = "Pin"; // "Pin" or "Heatmap"
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Pins = await PoiService.GetOverviewMapPinsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching map pins: {ex}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!IsLoading && !_isMapInitialized)
+        {
+            _isMapInitialized = true;
+            await RenderMapAsync();
+        }
+    }
+
+    private async Task ChangeMapMode(string mode)
+    {
+        if (MapMode == mode) return; // Không vẽ lại nếu đang ở chế độ đó
+        MapMode = mode;
+        await RenderMapAsync();
+    }
+
+    private async Task RenderMapAsync()
+    {
+        try
+        {
+            if (MapMode == "Pin")
+            {
+                await JSRuntime.InvokeVoidAsync("leafletMapInterop.initOverviewMap", "overview-map", Pins);
+            }
+            else if (MapMode == "Heatmap")
+            {
+                await JSRuntime.InvokeVoidAsync("leafletMapInterop.renderHeatmap", "overview-map", Pins);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Map render error: {ex.Message}");
+        }
+    }
+}

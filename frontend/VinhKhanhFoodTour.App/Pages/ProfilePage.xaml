@@ -29,17 +29,6 @@
                     <Label Text="{Binding UserRole}" FontSize="11" TextColor="#FFC107" CharacterSpacing="1" />
                 </VerticalStackLayout>
 
-                <Button Grid.Column="2" 
-                        Text="🚪 Logout" 
-                        Command="{Binding LogoutCommand}"
-                        BackgroundColor="Transparent"
-                        TextColor="#FF5252"
-                        FontSize="11"
-                        BorderWidth="1"
-                        BorderColor="#80FF5252"
-                        CornerRadius="8"
-                        Padding="12,5"
-                        VerticalOptions="Center" />
             </Grid>
 
             <BoxView HeightRequest="1" Color="#333333" Margin="0,5" />

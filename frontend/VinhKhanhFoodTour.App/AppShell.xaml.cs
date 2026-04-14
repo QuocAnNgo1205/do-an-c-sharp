@@ -17,6 +17,8 @@ public partial class AppShell : Shell
         Task.Run(async () => await CheckLoginStatusAsync());
     }
 
+    public bool IsInitialized { get; private set; } = false;
+
     private async Task CheckLoginStatusAsync()
     {
         try
@@ -36,16 +38,31 @@ public partial class AppShell : Shell
 
             if (string.IsNullOrEmpty(token) || isExpired)
             {
-                // Nếu token rỗng HOẶC đã hết hạn -> Thu hồi thông tin cũ và nhảy sang Login
+                // Nếu token rỗng HOẶC đã hết hạn -> Tự động đăng nhập Guest
                 SecureStorage.Remove("jwt_token");
                 SecureStorage.Remove("token_expiration");
+
+                var deviceId = await SecureStorage.GetAsync("device_id");
+                if (string.IsNullOrEmpty(deviceId))
+                {
+                    deviceId = Guid.NewGuid().ToString();
+                    await SecureStorage.SetAsync("device_id", deviceId);
+                }
+
+                var authService = new Services.AuthService();
+                await authService.GuestLoginAsync(deviceId);
+
+                IsInitialized = true; // Đánh dấu đã khởi tạo xong
+
                 await MainThread.InvokeOnMainThreadAsync(async () => 
                 {
-                    await Shell.Current.GoToAsync("//LoginPage");
+                    await Shell.Current.GoToAsync("//MainPage");
                 });
             }
             else
             {
+                IsInitialized = true; // Đánh dấu đã khởi tạo xong
+
                 // Nếu đã login (CÓ JWT_TOKEN VÀ CHƯA HẾT HẠN) -> Nhảy thẳng vào trang chủ
                 await MainThread.InvokeOnMainThreadAsync(async () => 
                 {
@@ -88,25 +105,24 @@ public partial class AppShell : Shell
 
             System.Diagnostics.Debug.WriteLine($"[DeepLink] Navigating to ProjectDetailPage with PoiId={poiId}");
 
+            // Đợi luồng CheckLoginStatus (Guest Auto Login) kết thúc
+            while (!IsInitialized)
+            {
+                await Task.Delay(100);
+            }
+
             // Đảm bảo đang ở Main Thread trước khi navigate
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                // Đảm bảo user đã đăng nhập trước khi điều hướng
-                var token = await SecureStorage.GetAsync("jwt_token");
-                if (string.IsNullOrEmpty(token))
-                {
-                    // Chưa login → lưu lại intent để xử lý sau khi login xong
-                    System.Diagnostics.Debug.WriteLine("[DeepLink] User not logged in, cannot navigate.");
-                    await DisplayToastAsync("Vui lòng đăng nhập để xem chi tiết quán ăn.");
-                    return;
-                }
-
-                // Navigate với PoiId dưới dạng query param — ProjectDetailPageModel nhận qua [QueryProperty]
                 // Truyền một Poi "stub" chỉ có Id, trang detail sẽ tự gọi API lấy đủ thông tin
                 var stubPoi = new Models.Poi { Id = poiId, Name = "Đang tải..." };
                 await Shell.Current.GoToAsync(
                     "ProjectDetailPage",
-                    new Dictionary<string, object> { ["Poi"] = stubPoi }
+                    new Dictionary<string, object> 
+                    { 
+                        ["Poi"] = stubPoi,
+                        ["IsFromQr"] = true
+                    }
                 );
             });
         }

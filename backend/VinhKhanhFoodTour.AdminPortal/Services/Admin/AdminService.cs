@@ -117,6 +117,20 @@ public class AdminService : IAdminService
             throw;
         }
     }
+
+    public async Task<UserStatsDto?> GetUserStatsAsync()
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<UserStatsDto>("api/v1/Users/stats");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching user stats: {ex.Message}");
+            throw;
+        }
+    }
 }
 
 /// <summary>

@@ -122,6 +122,67 @@ namespace VinhKhanhFoodTour.API.Controllers
 
             return Ok(new { Message = "Đăng ký thành công!" });
         }
+
+        [HttpPost("guest-login")]
+        public async Task<IActionResult> GuestLogin([FromBody] GuestLoginRequest request)
+        {
+            var deviceId = request.DeviceId;
+            if (string.IsNullOrEmpty(deviceId))
+            {
+                deviceId = Guid.NewGuid().ToString();
+            }
+
+            var user = await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Username == deviceId);
+
+            if (user == null)
+            {
+                var role = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Tourist");
+                if (role == null)
+                {
+                    return BadRequest(new { Message = "Lỗi hệ thống: Không tìm thấy Role Tourist!" });
+                }
+
+                user = new VinhKhanhFoodTour.Models.User
+                {
+                    Username = deviceId,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), 
+                    RoleId = role.Id,
+                    IsActive = true,
+                    PreferredLanguage = "vi"
+                };
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+            }
+
+            var claims = new[]
+            {
+                new Claim("sub", user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role?.RoleName ?? "Tourist")
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"]!,
+                audience: _configuration["Jwt:Audience"]!,
+                claims: claims,
+                expires: DateTime.UtcNow.AddDays(365), // Sống 1 năm
+                signingCredentials: creds
+            );
+
+            return Ok(new
+            {
+                Token = new JwtSecurityTokenHandler().WriteToken(token),
+                Role = user.Role?.RoleName ?? "Tourist",
+                Username = user.Username,
+                Email = user.Email ?? "Chưa cập nhật email",
+                Expiration = token.ValidTo
+            });
+        }
     }
 
     // Class phụ để nhận data từ Frontend gửi lên
@@ -137,5 +198,9 @@ namespace VinhKhanhFoodTour.API.Controllers
         public string Email { get; set; } = null!;
         public string Password { get; set; } = null!;
         // Role không được nhận từ client — luôn gán Tourist bởi server
+    }
+    public class GuestLoginRequest
+    {
+        public string DeviceId { get; set; } = null!;
     }
 }

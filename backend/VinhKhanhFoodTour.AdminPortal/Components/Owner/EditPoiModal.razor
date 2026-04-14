@@ -129,6 +129,7 @@
     private string? MainImageFileName = null;
     private bool IsInitialLoading = true;
     private bool IsSaving = false;
+    private bool _isMapInitialized = false;
     private DotNetObjectReference<EditPoiModal>? _dotNetRef;
 
     protected override async Task OnParametersSetAsync()
@@ -154,8 +155,8 @@
                     Name = poi.Name,
                     Latitude = poi.Latitude,
                     Longitude = poi.Longitude,
-                    Title = poi.Translations.FirstOrDefault(t => t.Language == "vi")?.Title ?? "",
-                    Description = poi.Translations.FirstOrDefault(t => t.Language == "vi")?.Description ?? ""
+                    Title = poi.Translations.FirstOrDefault(t => t.LanguageCode == "vi")?.Title ?? "",
+                    Description = poi.Translations.FirstOrDefault(t => t.LanguageCode == "vi")?.Description ?? ""
                 };
                 ExistingImageUrl = poi.ImageUrl;
             }
@@ -172,10 +173,11 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (IsOpen && !IsInitialLoading)
+        if (IsOpen && !IsInitialLoading && !_isMapInitialized)
         {
             try
             {
+                _isMapInitialized = true;
                 _dotNetRef ??= DotNetObjectReference.Create(this);
                 // Đợi một chút để element render xong
                 await Task.Delay(100); 
@@ -183,6 +185,7 @@
             }
             catch (Exception ex)
             {
+                _isMapInitialized = false;
                 Console.WriteLine($"JS Error: {ex.Message}");
             }
         }
@@ -245,6 +248,7 @@
     {
         try { await JS.InvokeVoidAsync("window.leafletMapInterop.destroyMap"); } catch { }
         IsInitialLoading = true;
+        _isMapInitialized = false;
         await OnClose.InvokeAsync();
     }
 

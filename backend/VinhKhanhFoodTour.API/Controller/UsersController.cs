@@ -18,6 +18,14 @@ namespace VinhKhanhFoodTour.API.Controller
             _context = context;
         }
 
+        [HttpGet("stats")]
+        public async Task<ActionResult> GetUserStats()
+        {
+            var tourists = await _context.Users.Include(u => u.Role).CountAsync(u => u.Role != null && u.Role.RoleName == "Tourist");
+            var owners = await _context.Users.Include(u => u.Role).CountAsync(u => u.Role != null && u.Role.RoleName == "Owner");
+            return Ok(new { TotalTourists = tourists, TotalOwners = owners, TotalUsers = tourists + owners });
+        }
+
         // GET: api/v1/Users
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetUsers()

@@ -52,4 +52,11 @@ namespace VinhKhanhFoodTour.DTOs
         public double Latitude { get; set; }
         public double Longitude { get; set; }
     }
+
+    public class OverviewMapPinDto : MapPinDto
+    {
+        public int Status { get; set; }
+        public int OwnerId { get; set; }
+        public int ListenCount { get; set; }
+    }
 }

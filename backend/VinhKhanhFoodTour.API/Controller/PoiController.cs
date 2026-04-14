@@ -367,7 +367,16 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                var poi = await _poiService.GetPublicPoiByIdAsync(id);
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                int? currentUserId = null;
+                if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var uId))
+                {
+                    currentUserId = uId;
+                }
+                var isAdmin = User.IsInRole("Admin");
+
+                var poi = await _poiService.GetPublicPoiByIdAsync(id, currentUserId, isAdmin);
                 return Ok(poi);
             }
             catch (KeyNotFoundException ex)
@@ -397,6 +406,23 @@ namespace VinhKhanhFoodTour.API.Controllers
         }
 
         // API: Lấy danh sách các quán ăn gần người dùng (Public - dựa trên vị trí)
+        [HttpGet("overview-pins")]
+        [Authorize(Roles = "Admin,Owner")]
+        public async Task<IActionResult> GetOverviewMapPins()
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+            
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var currentUserId))
+            {
+                return Unauthorized(new { Message = "Không thể xác định người dùng." });
+            }
+
+            var isAdmin = User.IsInRole("Admin");
+            var pins = await _poiService.GetOverviewMapPinsAsync(currentUserId, isAdmin);
+            return Ok(pins);
+        }
+
         [HttpGet("public/nearby")]
         [AllowAnonymous]
         public async Task<IActionResult> GetNearbyPois([FromQuery] double userLat, [FromQuery] double userLng, [FromQuery] double radiusInMeters = 50)

@@ -1,6 +1,7 @@
 @page "/owner/statistics"
 @using VinhKhanhFoodTour.AdminPortal.Services.Owner
 @using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@inject IJSRuntime JS
 <ProtectedRoute RequiredRoles="Owner">
     <div class="space-y-6">
         <!-- Header -->
@@ -9,15 +10,59 @@
                 <h1 class="text-3xl font-bold text-gray-800">Listen Statistics</h1>
                 <p class="text-gray-600 mt-1">Leaderboard of narration engagements for your restaurants.</p>
             </div>
-            <button @onclick="LoadStatisticsAsync" class="btn btn-secondary" disabled="@IsLoading">
-                🔄 Refresh
-            </button>
+            <div class="flex items-center gap-4">
+                <!-- Mode Switcher -->
+                <div class="bg-gray-100 p-1 rounded-lg flex shadow-inner">
+                    <button class="@(StatMode == "listen" ? "bg-white shadow px-4 py-2 rounded-md font-semibold text-blue-600" : "px-4 py-2 text-gray-500 hover:text-gray-700") transition-all"
+                            @onclick='() => ChangeStatMode("listen")'>
+                        🎙️ Lượt Nghe
+                    </button>
+                    <button class="@(StatMode == "scan" ? "bg-white shadow px-4 py-2 rounded-md font-semibold text-green-600" : "px-4 py-2 text-gray-500 hover:text-gray-700") transition-all"
+                            @onclick='() => ChangeStatMode("scan")'>
+                        📷 Quét QR
+                    </button>
+                </div>
+
+                <button @onclick="LoadStatisticsAsync" class="btn btn-secondary" disabled="@IsLoading">
+                    🔄 Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Trend Chart -->
+        <div class="card">
+            <div class="card-header flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-800">Biểu đồ @(StatMode == "listen" ? "Lượt Nghe" : "Lượt Quét QR")</h2>
+                <div class="flex bg-gray-200 rounded-lg p-1">
+                    <button class="@(TrendType == "day" ? "bg-white shadow-sm font-medium text-blue-600" : "text-gray-500 hover:text-gray-700") px-4 py-1.5 rounded-md text-sm transition-all"
+                            @onclick='() => ChangeTrendType("day")'>
+                        📅 30 Ngày Bấm
+                    </button>
+                    <button class="@(TrendType == "month" ? "bg-white shadow-sm font-medium text-blue-600" : "text-gray-500 hover:text-gray-700") px-4 py-1.5 rounded-md text-sm transition-all"
+                            @onclick='() => ChangeTrendType("month")'>
+                        📈 12 Tháng Bấm
+                    </button>
+                </div>
+            </div>
+            <div class="p-4" style="height: 350px;">
+                @if (IsLoadingTrend)
+                {
+                    <div class="flex h-full items-center justify-center text-gray-500">
+                        <div class="spinner-dot mx-auto mb-3"></div>
+                        <span class="ml-2">Đang tải dữ liệu biểu đồ...</span>
+                    </div>
+                }
+                else
+                {
+                    <canvas id="trendChart" class="w-full h-full"></canvas>
+                }
+            </div>
         </div>
 
         <!-- Leaderboard -->
         <div class="card">
             <div class="card-header">
-                <h2 class="text-xl font-bold text-gray-800">Top Restaurants by Listens</h2>
+                <h2 class="text-xl font-bold text-gray-800">Top Quán Được @(StatMode == "listen" ? "Nghe Nhiều Tới" : "Quét Mã Nhều Nhất")</h2>
             </div>
             
             <div class="p-6">
@@ -59,10 +104,12 @@
                                 <div class="flex-1">
                                     <div class="flex justify-between mb-1">
                                         <span class="font-medium text-gray-800">@(stat.PoiName ?? "Unknown Restaurant")</span>
-                                        <span class="font-bold text-blue-600">@stat.ListenCount <span class="text-xs font-normal text-gray-500">listens</span></span>
+                                        <span class="font-bold @(StatMode == "listen" ? "text-blue-600" : "text-green-600")">
+                                            @stat.ListenCount <span class="text-xs font-normal text-gray-500">@(StatMode == "listen" ? "lượt nghe" : "lượt quét")</span>
+                                        </span>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
-                                        <div class="bg-blue-500 h-4 rounded-full transition-all duration-1000 ease-out" 
+                                        <div class="@(StatMode == "listen" ? "bg-blue-500" : "bg-green-500") h-4 rounded-full transition-all duration-1000 ease-out" 
                                              style="width: @(percentage)%">
                                         </div>
                                     </div>
@@ -84,8 +131,13 @@
 
     private List<PoiListenStatsDto> ListenStats = new();
     private bool IsLoading = true;
+    private bool IsLoadingTrend = true;
     private bool _isInitialized = false;
     private int MaxCount = 0;
+    
+    private List<ListenTrendDto> ListenTrends = new();
+    private string TrendType = "day"; // "day" or "month"
+    private string StatMode = "listen"; // "listen" or "scan"
 
     protected override async Task OnInitializedAsync()
     {
@@ -94,7 +146,7 @@
 
         try
         {
-            await LoadStatisticsAsync();
+            await Task.WhenAll(LoadStatisticsAsync(), LoadTrendAsync());
         }
         catch (Exception ex)
         {
@@ -107,6 +159,46 @@
         }
     }
 
+    private async Task ChangeTrendType(string type)
+    {
+        if (TrendType == type) return;
+        TrendType = type;
+        await LoadTrendAsync();
+    }
+
+    private async Task LoadTrendAsync()
+    {
+        if (PoiService == null) return;
+        IsLoadingTrend = true;
+        
+        try
+        {
+            ListenTrends = await PoiService.GetListenTrendAsync(TrendType, StatMode);
+            
+            // Vẽ biểu đồ khi load xong Data
+            if (ListenTrends != null && ListenTrends.Any())
+            {
+                var labels = ListenTrends.Select(t => t.Label).ToArray();
+                var data = ListenTrends.Select(t => t.ListenCount).ToArray();
+                
+                IsLoadingTrend = false;
+                StateHasChanged(); // Ép render canvas
+                
+                // Đợi render markup
+                await Task.Delay(100); 
+                await JS.InvokeVoidAsync("chartInterop.renderTrendChart", "trendChart", labels, data);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception loading ListenTrend: {ex}");
+        }
+        finally
+        {
+            IsLoadingTrend = false;
+        }
+    }
+
     private async Task LoadStatisticsAsync()
     {
         if (PoiService == null) return;
@@ -114,8 +206,14 @@
         IsLoading = true;
         try
         {
-            ListenStats = await PoiService.GetListenStatsAsync();
+            ListenStats = await PoiService.GetListenStatsAsync(StatMode);
             MaxCount = ListenStats?.Count > 0 ? ListenStats.Max(s => s.ListenCount) : 0;
+            
+            // Sync with trend chart if refresh button is clicked
+            if (_isInitialized)
+            {
+                await LoadTrendAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -138,5 +236,13 @@
         if (MaxCount == 0 || listenCount == 0) return 3; // Minimum width for visibility
         double percentage = ((double)listenCount / MaxCount) * 100;
         return (int)Math.Max(3, Math.Min(100, Math.Round(percentage)));
+    }
+
+    private async Task ChangeStatMode(string mode)
+    {
+        if (StatMode == mode) return;
+        StatMode = mode;
+        // Tải lại cả bảng thành tích và biểu đồ
+        await Task.WhenAll(LoadStatisticsAsync(), LoadTrendAsync());
     }
 }

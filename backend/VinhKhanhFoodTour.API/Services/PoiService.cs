@@ -277,16 +277,26 @@ namespace VinhKhanhFoodTour.API.Services
                 .ToListAsync();
         }
 
-        public async Task<PoiDetailDto> GetPublicPoiByIdAsync(int id)
+        public async Task<PoiDetailDto> GetPublicPoiByIdAsync(int id, int? currentUserId = null, bool isAdmin = false)
         {
             var poi = await _context.Pois
                 .Include(p => p.Translations)
-                .FirstOrDefaultAsync(p => p.Id == id && p.Status == PoiStatus.Approved);
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (poi == null)
             {
-                throw new KeyNotFoundException($"Không tìm thấy quán truy cập công khai với ID: {id}");
+                throw new KeyNotFoundException($"Không tìm thấy quán với ID: {id}");
             }
+
+            if (poi.Status != PoiStatus.Approved)
+            {
+                if (!isAdmin && (!currentUserId.HasValue || poi.OwnerId != currentUserId.Value))
+                {
+                    throw new KeyNotFoundException($"Quán chưa được duyệt công khai (ID: {id})");
+                }
+            }
+
+
 
             var baseUrl = GetBaseUrl();
             return new PoiDetailDto
@@ -319,6 +329,30 @@ namespace VinhKhanhFoodTour.API.Services
                     Longitude = SpatialHelper.GetLongitude(p.Location)
                 })
                 .ToListAsync();
+        }
+
+        public async Task<List<OverviewMapPinDto>> GetOverviewMapPinsAsync(int currentUserId, bool isAdmin)
+        {
+            var query = _context.Pois.AsQueryable();
+            
+            if (!isAdmin)
+            {
+                query = query.Where(p => p.OwnerId == currentUserId);
+            }
+
+            // Lấy trực tiếp danh sách các thực thể POI kèm NarrationLogs để đếm lượt nghe
+            var rawPois = await query.Include(p => p.NarrationLogs).ToListAsync();
+
+            return rawPois.Select(p => new OverviewMapPinDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Latitude = SpatialHelper.GetLatitude(p.Location),
+                Longitude = SpatialHelper.GetLongitude(p.Location),
+                Status = (int)p.Status,
+                OwnerId = p.OwnerId,
+                ListenCount = p.NarrationLogs.Count
+            }).ToList();
         }
 
         public async Task<List<PoiDto>> GetNearbyPoisAsync(double userLat, double userLng, double radiusInMeters)

@@ -7,6 +7,7 @@ using VinhKhanhFoodTour.App.Services;
 namespace VinhKhanhFoodTour.App.PageModels
 {
     [QueryProperty(nameof(Poi), "Poi")]
+    [QueryProperty(nameof(IsFromQr), "IsFromQr")]
     public partial class ProjectDetailPageModel : ObservableObject
     {
         private readonly AudioGuideService _audioGuideService;
@@ -20,6 +21,9 @@ namespace VinhKhanhFoodTour.App.PageModels
 
         [ObservableProperty]
         private bool isLoadingAudio;
+
+        [ObservableProperty]
+        private bool isFromQr;
 
         [ObservableProperty]
         private string displayDescription = "Đang tải thông tin...";
@@ -64,6 +68,24 @@ namespace VinhKhanhFoodTour.App.PageModels
                 else
                 {
                     DisplayDescription = currentPoi.Description ?? "Chưa có thông tin giới thiệu chi tiết cho địa điểm này.";
+                }
+
+                // Nếu được điều hướng từ QR Code -> Gắn log Scan Tracker
+                if (IsFromQr)
+                {
+                    var deviceId = await SecureStorage.GetAsync("device_id");
+                    if (!string.IsNullOrEmpty(deviceId))
+                    {
+                        var reqData = new
+                        {
+                            PoiId = currentPoi.Id,
+                            DeviceId = deviceId,
+                            Timestamp = DateTime.UtcNow
+                        };
+                        // Đẩy không chờ kết quả để trải nghiệm UX không bị block
+                        _ = _apiService.PostAsync("public/logs/scan", reqData);
+                    }
+                    IsFromQr = false; // Tránh tracking 2 lần nếu user refresh lại trang này
                 }
             }
             catch

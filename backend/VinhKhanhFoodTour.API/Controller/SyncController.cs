@@ -178,9 +178,30 @@ namespace VinhKhanhFoodTour.API.Controllers
             return Ok(new { Message = "Đã ghi nhận lượt nghe.", Id = log.Id });
         }
 
+        // Ghi nhận lượt quét QR Code
+        [HttpPost("public/logs/scan")]
+        [AllowAnonymous]
+        public async Task<IActionResult> LogQrScan([FromBody] NarrationLogRequestDto request)
+        {
+            if (request == null || request.PoiId <= 0 || string.IsNullOrEmpty(request.DeviceId))
+            {
+                return BadRequest(new { Message = "Dữ liệu không hợp lệ." });
+            }
+
+            var log = new QrScanLog
+            {
+                PoiId = request.PoiId,
+                DeviceId = request.DeviceId,
+                Timestamp = request.Timestamp ?? DateTime.UtcNow
+            };
+            _context.QrScanLogs.Add(log);
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Đã ghi nhận lượt quét QR.", Id = log.Id });
+        }
+
         [HttpGet("owner/stats/listens")]
         [Authorize(Roles = "Owner")]
-        public async Task<IActionResult> GetOwnerListenStats()
+        public async Task<IActionResult> GetOwnerListenStats([FromQuery] string mode = "listen")
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub")?.Value;
             if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var ownerId))
@@ -194,11 +215,115 @@ namespace VinhKhanhFoodTour.API.Controllers
                 {
                     PoiId = p.Id,
                     PoiName = p.Name,
-                    ListenCount = _context.NarrationLogs.Count(n => n.PoiId == p.Id)
+                    ListenCount = mode.ToLower() == "scan" 
+                        ? _context.QrScanLogs.Count(n => n.PoiId == p.Id)
+                        : _context.NarrationLogs.Count(n => n.PoiId == p.Id)
                 })
                 .ToListAsync();
 
             return Ok(stats);
+        }
+
+        [HttpGet("owner/stats/listens/trend")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> GetOwnerListenTrend([FromQuery] string type = "day", [FromQuery] string mode = "listen")
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var ownerId))
+            {
+                return Unauthorized(new { Message = "Không thể xác định người dùng." });
+            }
+
+            var ownerPoiIds = await _context.Pois
+                .Where(p => p.OwnerId == ownerId)
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            if (!ownerPoiIds.Any())
+            {
+                return Ok(new List<ListenTrendDto>());
+            }
+
+            var trend = new List<ListenTrendDto>();
+
+            // Convert to list of DateTime based on mode
+            List<DateTime> logDates;
+            if (mode.ToLower() == "scan") 
+            {
+                 logDates = await _context.QrScanLogs
+                    .Where(n => ownerPoiIds.Contains(n.PoiId))
+                    .Select(n => n.Timestamp)
+                    .ToListAsync();
+            }
+            else
+            {
+                 logDates = await _context.NarrationLogs
+                    .Where(n => ownerPoiIds.Contains(n.PoiId))
+                    .Select(n => n.Timestamp)
+                    .ToListAsync();
+            }
+
+            if (type.ToLower() == "month")
+            {
+                // Last 12 months
+                var startDate = DateTime.UtcNow.AddMonths(-11);
+                var startDateMonth = new DateTime(startDate.Year, startDate.Month, 1);
+                
+                var logsFiltered = logDates.Where(d => d >= startDateMonth).ToList();
+                
+                var grouped = logsFiltered
+                    .GroupBy(d => new { d.Year, d.Month })
+                    .Select(g => new ListenTrendDto
+                    {
+                        Label = $"{g.Key.Month:D2}/{g.Key.Year}",
+                        ListenCount = g.Count()
+                    })
+                    .ToList();
+
+                // Fill gaps
+                for (int i = 0; i < 12; i++)
+                {
+                    var d = startDateMonth.AddMonths(i);
+                    var label = $"{d.Month:D2}/{d.Year}";
+                    if (!grouped.Any(x => x.Label == label))
+                    {
+                        grouped.Add(new ListenTrendDto { Label = label, ListenCount = 0 });
+                    }
+                }
+                
+                // Sort chronologically (MM/yyyy string sorting won't work well directly without parsing, so order by parsed date)
+                trend = grouped.OrderBy(x => DateTime.ParseExact(x.Label, "MM/yyyy", null)).ToList();
+            }
+            else
+            {
+                // Last 30 days
+                var startDate = DateTime.UtcNow.Date.AddDays(-29);
+                var logsFiltered = logDates.Where(d => d >= startDate).ToList();
+
+                var grouped = logsFiltered
+                    .GroupBy(d => d.Date)
+                    .Select(g => new ListenTrendDto
+                    {
+                        Label = g.Key.ToString("dd/MM"),
+                        ListenCount = g.Count()
+                    })
+                    .ToList();
+
+                // Fill gaps for 30 days
+                for (int i = 0; i < 30; i++)
+                {
+                    var d = startDate.AddDays(i);
+                    var label = d.ToString("dd/MM");
+                    if (!grouped.Any(x => x.Label == label))
+                    {
+                        grouped.Add(new ListenTrendDto { Label = label, ListenCount = 0 });
+                    }
+                }
+
+                trend = grouped.OrderBy(x => DateTime.ParseExact(x.Label, "dd/MM", null)).ToList();
+            }
+
+            return Ok(trend);
         }
 
         // API: Kiểm tra phiên bản dữ liệu (Dùng mã SHA-256 làm Version)

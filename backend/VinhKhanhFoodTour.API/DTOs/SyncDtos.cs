@@ -32,4 +32,10 @@ namespace VinhKhanhFoodTour.DTOs
         public string PoiName { get; set; } = string.Empty;
         public int ListenCount { get; set; }
     }
+
+    public class ListenTrendDto
+    {
+        public string Label { get; set; } = string.Empty;
+        public int ListenCount { get; set; }
+    }
 }

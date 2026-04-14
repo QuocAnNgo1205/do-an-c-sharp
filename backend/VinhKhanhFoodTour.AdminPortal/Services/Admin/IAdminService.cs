@@ -48,6 +48,13 @@ public class CreateUserDto
     public string RoleName { get; set; } = "Owner";
 }
 
+public class UserStatsDto
+{
+    public int TotalTourists { get; set; }
+    public int TotalOwners { get; set; }
+    public int TotalUsers { get; set; }
+}
+
 /// <summary>
 /// Service interface for admin operations on POIs
 /// </summary>
@@ -87,4 +94,9 @@ public interface IAdminService
     /// Add a new user (Admin only)
     /// </summary>
     Task<UserActionResponseDto> AddUserAsync(CreateUserDto dto);
+
+    /// <summary>
+    /// Get user stats (Admin only)
+    /// </summary>
+    Task<UserStatsDto?> GetUserStatsAsync();
 }

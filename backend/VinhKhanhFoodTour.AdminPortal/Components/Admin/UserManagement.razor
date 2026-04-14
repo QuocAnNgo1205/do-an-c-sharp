@@ -20,6 +20,28 @@
             </div>
         </div>
 
+        <!-- Stats Cards -->
+        @if (Stats != null)
+        {
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="card">
+                    <div class="text-sm text-gray-600 uppercase tracking-wide">Tổng tài khoản</div>
+                    <div class="text-3xl font-bold text-purple-600 mt-2">@Stats.TotalUsers</div>
+                    <p class="text-xs text-gray-500 mt-2">Toàn bộ hệ thống</p>
+                </div>
+                <div class="card">
+                    <div class="text-sm text-gray-600 uppercase tracking-wide">Người Tải App (Tourists)</div>
+                    <div class="text-3xl font-bold text-blue-600 mt-2">@Stats.TotalTourists</div>
+                    <p class="text-xs text-gray-500 mt-2">Sử dụng dịch vụ Audio Guide</p>
+                </div>
+                <div class="card">
+                    <div class="text-sm text-gray-600 uppercase tracking-wide">Chủ Quán (Owners)</div>
+                    <div class="text-3xl font-bold text-orange-600 mt-2">@Stats.TotalOwners</div>
+                    <p class="text-xs text-gray-500 mt-2">Đăng ký kinh doanh ẩm thực</p>
+                </div>
+            </div>
+        }
+
         <!-- Users Table -->
         <div class="card">
             <div class="card-header">
@@ -214,6 +236,7 @@
     private Notifications? NotificationComponent { get; set; }
 
     private List<UserDto> Users = new();
+    private UserStatsDto? Stats = null;
     private bool IsLoading = true;
     private bool _isInitialized = false;
     private int? ProcessingUserId = null;
@@ -254,6 +277,7 @@
         try
         {
             Users = await AdminService.GetUsersAsync();
+            Stats = await AdminService.GetUserStatsAsync();
         }
         catch (Exception ex)
         {

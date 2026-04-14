@@ -1,6 +1,7 @@
 @page "/admin/dashboard"
 @using VinhKhanhFoodTour.AdminPortal.Services.Admin
 @using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@inject NavigationManager NavManager
 <ProtectedRoute RequiredRoles="Admin">
     <div class="space-y-6">
         <!-- Header -->
@@ -73,6 +74,12 @@
                                     </td>
                                     <td>
                                         <div class="flex gap-2">
+                                            <button class="btn btn-secondary text-sm"
+                                                    @onclick="() => PreviewPoi(poi.Id)"
+                                                    title="Xem chi tiết quán ăn"
+                                                    disabled="@IsApproving">
+                                                🔍 Xem trước
+                                            </button>
                                             <button 
                                                 class="btn btn-approve text-sm" 
                                                 @onclick="() => ApprovePoiAsync(poi.Id)"
@@ -222,6 +229,11 @@
     private void ShowRejectModal(AdminPoiDto poi)
     {
         RejectModal?.ShowModal(poi);
+    }
+
+    private void PreviewPoi(int poiId)
+    {
+        NavManager.NavigateTo($"/poi/{poiId}");
     }
 
     private async Task OnPoiRejected(AdminPoiDto poi)
