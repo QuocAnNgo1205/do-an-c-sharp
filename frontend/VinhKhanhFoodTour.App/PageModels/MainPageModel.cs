@@ -12,6 +12,7 @@ namespace VinhKhanhFoodTour.App.PageModels
         private readonly AudioGuideService _audioGuideService;
         private readonly GeofenceManager _geofenceManager;
         private readonly PoiCacheService _poiCache;
+        private bool _isGeofenceStarted = false; // Guard: tránh Start() bị gọi nhiều lần
 
         [ObservableProperty]
         private ObservableCollection<Poi> restaurants = new();
@@ -19,6 +20,9 @@ namespace VinhKhanhFoodTour.App.PageModels
         [ObservableProperty] private bool isBusy;
         [ObservableProperty] private bool isRefreshing;
         [ObservableProperty] private string searchText = string.Empty;
+
+        // 🗺️ MỚI: Dữ liệu cho Danh sách Tour
+        [ObservableProperty] private ObservableCollection<Tour> toursList = new();
 
         // 📊 MỚI: Dữ liệu cho biểu đồ thống kê quán ăn
         [ObservableProperty] private ObservableCollection<PoiCategory> categoryData = new();
@@ -62,6 +66,7 @@ namespace VinhKhanhFoodTour.App.PageModels
                         Restaurants.Clear();
                         foreach (var item in cached) Restaurants.Add(item);
                         UpdateChartData();
+                        UpdateMockToursData();
                     });
                     _ = UpdateDistancesAsync();
                 }
@@ -87,11 +92,19 @@ namespace VinhKhanhFoodTour.App.PageModels
                         Restaurants.Clear();
                         foreach (var item in data) Restaurants.Add(item);
                         UpdateChartData();
+                        UpdateMockToursData();
                     });
                     _ = UpdateDistancesAsync();
                 }
             }
-            catch (Exception) { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainPage] Lỗi load data: {ex.Message}");
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    await Shell.Current.DisplayAlertAsync("Lỗi kết nối", "Không thể cập nhật danh sách địa điểm. Có thể do mạng yếu hoặc máy chủ bị gián đoạn.", "Thử lại");
+                });
+            }
             finally
             {
                 IsRefreshing = false;
@@ -139,6 +152,43 @@ namespace VinhKhanhFoodTour.App.PageModels
                 }
             }
             catch { }
+        }
+
+        private void UpdateMockToursData()
+        {
+            if (ToursList.Count > 0) return; // Đã có data rồi thì khỏi load lại
+
+            var allPoiIds = Restaurants.Select(r => r.Id).ToList();
+
+            ToursList.Add(new Tour
+            {
+                Id = 1,
+                Title = "Grill & Neon Lights",
+                NumberOfStops = 5,
+                Duration = "85",
+                ImageUrl = "https://images.unsplash.com/photo-1555939594-58d7cb561ad1",
+                PoiIds = allPoiIds.Take(5).ToList() // Lấy 5 quán đầu làm Tour thịt nướng
+            });
+
+            ToursList.Add(new Tour
+            {
+                Id = 2,
+                Title = "The Street Food Fusion",
+                NumberOfStops = 4,
+                Duration = "60",
+                ImageUrl = "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38",
+                PoiIds = allPoiIds.Skip(3).Take(4).ToList() // Trộn 4 quán ngẫu nhiên
+            });
+
+            ToursList.Add(new Tour
+            {
+                Id = 3,
+                Title = "Hẻm Ốc Đêm Sài Thành",
+                NumberOfStops = 6,
+                Duration = "120",
+                ImageUrl = "https://images.unsplash.com/photo-1549488344-c102df0827f3",
+                PoiIds = allPoiIds.OrderBy(x => Guid.NewGuid()).Take(6).ToList()
+            });
         }
 
         // --- TÍNH NĂNG MỚI: THUYẾT MINH ĐỒNG BỘ ---
@@ -198,6 +248,14 @@ namespace VinhKhanhFoodTour.App.PageModels
         private async Task Appearing()
         {
             await LoadDataAsync();
+
+            // 🛰️ BUG FIX: Khởi động GPS Geofencing nếu chưa Start
+            if (!_isGeofenceStarted)
+            {
+                _geofenceManager.Start();
+                _isGeofenceStarted = true;
+                System.Diagnostics.Debug.WriteLine("[MainPage] ✅ GeofenceManager Started.");
+            }
         }
 
         [RelayCommand]
@@ -218,6 +276,17 @@ namespace VinhKhanhFoodTour.App.PageModels
         {
             if (selectedPoi == null) return;
             await Shell.Current.GoToAsync($"///MapPage?Lat={selectedPoi.Latitude}&Lon={selectedPoi.Longitude}&Name={Uri.EscapeDataString(selectedPoi.Name)}");
+        }
+
+        [RelayCommand]
+        private async Task GoToTour(Tour selectedTour)
+        {
+            if (selectedTour == null) return;
+            // Nhảy sang trang Tour Detail và truyền dữ liệu Tour qua
+            await Shell.Current.GoToAsync("tourdetail", new Dictionary<string, object>
+            {
+                { "TourData", selectedTour }
+            });
         }
     }
 }

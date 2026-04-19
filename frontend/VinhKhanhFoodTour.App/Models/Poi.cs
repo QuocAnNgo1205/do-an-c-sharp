@@ -22,6 +22,9 @@ namespace VinhKhanhFoodTour.App.Models
         [JsonPropertyName("description")]
         public string Description { get; set; } = string.Empty;
 
+        [JsonPropertyName("address")]
+        public string Address { get; set; } = "Đường Vĩnh Khánh, Phường 8, Quận 4, TP.Hồ Chí Minh";
+
         [JsonPropertyName("latitude")]
         public double Latitude { get; set; }
 

@@ -85,6 +85,7 @@ public static class MauiProgram
 
         // 3. ĐĂNG KÝ ROUTES (Trang chi tiết)
         builder.Services.AddTransientWithShellRoute<ProjectDetailPage, ProjectDetailPageModel>("project");
+        builder.Services.AddTransient<TourDetailPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

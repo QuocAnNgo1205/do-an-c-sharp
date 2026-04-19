@@ -2,8 +2,9 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:maps="http://schemas.microsoft.com/dotnet/2021/maui/maps"
+             xmlns:services="clr-namespace:VinhKhanhFoodTour.App.Services"
              x:Class="VinhKhanhFoodTour.App.Pages.MapPage"
-             Title="Bản đồ">
+             Title="{services:Translate TabMap}">
 
     <Grid>
         <!-- Bản đồ nạp pins -->
@@ -32,7 +33,7 @@
                 
                 <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                     <Label Text="SMART AUDIO GUIDE" FontSize="12" FontAttributes="Bold" TextColor="#FFC107" CharacterSpacing="1" />
-                    <Label Text="Tự động thuyết minh chạy ngầm" FontSize="10" TextColor="#AAAAAA" />
+                    <Label Text="{services:Translate AutoPlaySubtitle}" FontSize="10" TextColor="#AAAAAA" />
                 </VerticalStackLayout>
 
                 <Switch Grid.Column="2" 
@@ -104,26 +105,36 @@
                            MaxLines="2"
                            LineBreakMode="TailTruncation" />
 
-                    <!-- 2 Nút hành động -->
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,4,0,0">
+                    <!-- 2 Nút hành động Cải Tiến -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,4,0,0">
                         <Button Grid.Column="0"
                                 x:Name="BtnSpeak"
-                                Text="🔊 Thuyết minh"
-                                BackgroundColor="#2E7D32"
+                                Text="{services:Translate AudioPlay}"
+                                BackgroundColor="#FF6F00"
                                 TextColor="White"
-                                CornerRadius="10"
-                                HeightRequest="44"
+                                FontAttributes="Bold"
+                                CornerRadius="24"
+                                HeightRequest="46"
                                 FontSize="13"
-                                Clicked="OnSpeakClicked" />
+                                Clicked="OnSpeakClicked">
+                            <Button.Shadow>
+                                <Shadow Brush="Black" Offset="0,4" Opacity="0.2" Radius="6" />
+                            </Button.Shadow>
+                        </Button>
 
                         <Button Grid.Column="1"
-                                Text="📋 Chi tiết"
-                                BackgroundColor="#1E88E5"
+                                Text="{services:Translate ViewDetail}"
+                                BackgroundColor="#2C2C2E"
                                 TextColor="White"
-                                CornerRadius="10"
-                                HeightRequest="44"
+                                FontAttributes="Bold"
+                                CornerRadius="24"
+                                HeightRequest="46"
                                 FontSize="13"
-                                Clicked="OnDetailClicked" />
+                                Clicked="OnDetailClicked">
+                            <Button.Shadow>
+                                <Shadow Brush="Black" Offset="0,4" Opacity="0.2" Radius="6" />
+                            </Button.Shadow>
+                        </Button>
                     </Grid>
                 </VerticalStackLayout>
             </Grid>

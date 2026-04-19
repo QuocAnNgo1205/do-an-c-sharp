@@ -3,9 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:VinhKhanhFoodTour.App.PageModels"
              xmlns:models="clr-namespace:VinhKhanhFoodTour.App.Models"
+             xmlns:services="clr-namespace:VinhKhanhFoodTour.App.Services"
              x:Class="VinhKhanhFoodTour.App.Pages.ProjectDetailPage"
              x:DataType="pageModels:ProjectDetailPageModel"
-             Title="Thông tin chi tiết"
+             Title="{services:Translate PlaceDetailTitle}"
              BackgroundColor="#0F0F0F">
 
     <ScrollView>
@@ -47,41 +48,47 @@
 
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,5">
                         <Button Grid.Column="0" 
-                                Text="📍 BẢN ĐỒ"
+                                Text="{services:Translate MapButton}"
                                 Command="{Binding OpenMapCommand}"
-                                BackgroundColor="#2196F3" 
+                                BackgroundColor="#2C2C2E" 
                                 TextColor="White" 
                                 FontAttributes="Bold" 
-                                CornerRadius="12" 
-                                HeightRequest="55" />
+                                CornerRadius="28" 
+                                HeightRequest="56">
+                            <Button.Shadow>
+                                <Shadow Brush="Black" Offset="0,4" Opacity="0.2" Radius="6" />
+                            </Button.Shadow>
+                        </Button>
 
                         <Grid Grid.Column="1">
-                            <Button Text="🔊 THUYẾT MINH"
+                            <Button Text="{services:Translate AudioPlay}"
                                     Command="{Binding ToggleAudioCommand}"
-                                    BackgroundColor="#FFC107" 
-                                    TextColor="#121212" 
+                                    BackgroundColor="#FF6F00" 
+                                    TextColor="White" 
                                     FontAttributes="Bold" 
-                                    CornerRadius="12" 
-                                    HeightRequest="55">
+                                    CornerRadius="28" 
+                                    HeightRequest="56">
+                                <Button.Shadow>
+                                    <Shadow Brush="Black" Offset="0,4" Opacity="0.2" Radius="6" />
+                                </Button.Shadow>
                                 <Button.Triggers>
                                     <DataTrigger TargetType="Button" Binding="{Binding IsPlaying}" Value="True">
-                                        <Setter Property="Text" Value="⏹️ DỪNG PHÁT" />
-                                        <Setter Property="BackgroundColor" Value="#F44336" />
-                                        <Setter Property="TextColor" Value="White" />
+                                        <Setter Property="Text" Value="{services:Translate AudioStop}" />
+                                        <Setter Property="BackgroundColor" Value="#D32F2F" />
                                     </DataTrigger>
                                 </Button.Triggers>
                             </Button>
                             
                             <ActivityIndicator IsVisible="{Binding IsLoadingAudio}"
                                                IsRunning="{Binding IsLoadingAudio}"
-                                               Color="#121212"
+                                               Color="White"
                                                HorizontalOptions="Center"
                                                VerticalOptions="Center"
                                                HeightRequest="30" WidthRequest="30" />
                         </Grid>
                     </Grid>
 
-                    <BoxView HeightRequest="1" Color="#333333" Margin="0,5" />
+                    <BoxView HeightRequest="1" Color="#2A2A2A" Margin="0,10" />
 
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Giới thiệu điểm đến" 
@@ -95,15 +102,21 @@
                                LineHeight="1.5" />
                     </VerticalStackLayout>
 
-                    <Border BackgroundColor="#252525" 
-                            StrokeShape="RoundRectangle 12" 
-                            Padding="15" 
+                    <Border BackgroundColor="#2C2C2E" 
+                            StrokeShape="RoundRectangle 20" 
+                            StrokeThickness="0"
+                            Padding="20,15" 
                             Margin="0,10,0,20">
-                        <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
-                            <Label Text="📍 Vị trí GPS:" TextColor="#888888" FontSize="12"/>
-                            <Label Text="{Binding Poi.Latitude, StringFormat='Lat: {0:F4}'}" TextColor="#AAAAAA" FontSize="12"/>
-                            <Label Text="{Binding Poi.Longitude, StringFormat='Lng: {0:F4}'}" TextColor="#AAAAAA" FontSize="12"/>
-                        </HorizontalStackLayout>
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="15">
+                            <Frame Grid.Column="0" WidthRequest="40" HeightRequest="40" CornerRadius="20" BackgroundColor="#3A3A3C" Padding="0" HasShadow="False" VerticalOptions="Center">
+                                <Label Text="📍" HorizontalOptions="Center" VerticalOptions="Center" FontSize="18"/>
+                            </Frame>
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                                <Label Text="{services:Translate AddressLabel}" TextColor="#888888" FontSize="11" FontAttributes="Bold" TextTransform="Uppercase"/>
+                                <Label Text="{Binding Poi.Title}" TextColor="White" FontSize="15" FontAttributes="Bold" />
+                                <Label Text="{Binding Poi.Address}" TextColor="#AAAAAA" FontSize="13" />
+                            </VerticalStackLayout>
+                        </Grid>
                     </Border>
                 </VerticalStackLayout>
             </Border>

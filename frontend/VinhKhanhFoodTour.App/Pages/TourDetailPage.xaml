@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:VinhKhanhFoodTour.App.Models"
+             xmlns:services="clr-namespace:VinhKhanhFoodTour.App.Services"
+             xmlns:maps="http://schemas.microsoft.com/dotnet/2021/maui/maps"
+             x:Class="VinhKhanhFoodTour.App.Pages.TourDetailPage"
+             Title="{services:Translate TourDetailTitle}"
+             BackgroundColor="#0F1014"
+             x:Name="ThisPage">
+
+    <Grid RowDefinitions="250, Auto, *">
+        <!-- Bản đồ Tour (Top Half) -->
+        <maps:Map Grid.Row="0"
+                  x:Name="tourMap"
+                  IsShowingUser="True"
+                  MapType="Street"
+                  Margin="0,0,0,-20"/> <!-- Kéo dài xuống để ẩn góc dưới của bản đồ vào sau Frame -->
+
+        <!-- Bảng điều khiển Tour (Bottom Sheet Header) -->
+        <Border Grid.Row="1"
+               Margin="0,0,0,0"
+               Padding="20,20,20,10"
+               StrokeShape="RoundRectangle 24,24,0,0"
+               BackgroundColor="White"
+               StrokeThickness="0">
+            <VerticalStackLayout Spacing="5">
+                <Label Text="{Binding Source={x:Reference ThisPage}, Path=BindingContext.Title}"
+                       FontSize="22"
+                       FontAttributes="Bold"
+                       TextColor="Black" />
+                
+                <Grid ColumnDefinitions="*, Auto" Margin="0,10,0,0">
+                    <Label Grid.Column="0"
+                           Text="{services:Translate TourStops}" 
+                           FontSize="16" 
+                           FontAttributes="Bold" 
+                           TextColor="Black"/>
+                    
+                    <HorizontalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                        <Label Text="{Binding Source={x:Reference ThisPage}, Path=BindingContext.NumberOfStops}" FontSize="14" TextColor="Gray"/>
+                        <Label Text="{services:Translate StopsText}" FontSize="14" TextColor="Gray"/>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <Border BackgroundColor="#E8F5E9" StrokeThickness="0" StrokeShape="RoundRectangle 25" Padding="15,5" Margin="0,10,0,0">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <Label Grid.Column="0"
+                               Text="{services:Translate SimulateMove}" 
+                               FontSize="14" 
+                               TextColor="#2E7D32"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"/>
+                        
+                        <Switch Grid.Column="1"
+                                x:Name="AutoPlaySwitch"
+                                OnColor="#4CAF50"
+                                Toggled="OnAutoPlayToggled"/>
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Danh sách Quán (POIs) -->
+        <CollectionView Grid.Row="2"
+                        x:Name="TourList"
+                        BackgroundColor="White"
+                        SelectionMode="None">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:Poi">
+                    <Frame Margin="0,0,0,10"
+                           Padding="10"
+                           CornerRadius="10"
+                           BorderColor="#E0E0E0"
+                           BackgroundColor="White">
+                        <Grid ColumnDefinitions="60, *, Auto">
+                            <Frame Grid.Column="0" 
+                                   WidthRequest="50" 
+                                   HeightRequest="50" 
+                                   CornerRadius="25" 
+                                   Padding="0" 
+                                   IsClippedToBounds="True">
+                                <Image Source="{Binding ImageUrl}" 
+                                       Aspect="AspectFill" />
+                            </Frame>
+                            
+                            <StackLayout Grid.Column="1" VerticalOptions="Center" Margin="15,0,0,0">
+                                <Label Text="{Binding Name}" 
+                                       FontAttributes="Bold" 
+                                       TextColor="Black" 
+                                       FontSize="16"/>
+                                <Label Text="{Binding Title}" 
+                                       TextColor="Gray" 
+                                       FontSize="12"
+                                       LineBreakMode="TailTruncation"
+                                       MaxLines="1"/>
+                                <Label Text="{Binding DistanceDisplay}" 
+                                       TextColor="#4CAF50" 
+                                       FontSize="12"
+                                       FontAttributes="Bold"
+                                       Margin="0,2,0,0"/>
+                            </StackLayout>
+
+                            <Image Grid.Column="2" 
+                                   Source="icon_chevron_right.png" 
+                                   WidthRequest="20" 
+                                   HeightRequest="20" 
+                                   VerticalOptions="Center" />
+                        </Grid>
+                        
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnPoiTapped" CommandParameter="{Binding .}" />
+                        </Frame.GestureRecognizers>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>

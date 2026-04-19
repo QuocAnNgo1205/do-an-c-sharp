@@ -57,6 +57,9 @@ namespace VinhKhanhFoodTour.App.PageModels
             SelectedLanguage = AvailableLanguages.FirstOrDefault(l => l.Code == savedLang) 
                               ?? AvailableLanguages.First();
             _isInitializing = false;
+            
+            // Thiết lập ngôn ngữ tĩnh cho Trình quản lý UI App
+            LocalizationManager.Instance.SetLanguage(SelectedLanguage.Code);
         }
 
         partial void OnSelectedLanguageChanged(LanguageInfo? value)
@@ -71,6 +74,9 @@ namespace VinhKhanhFoodTour.App.PageModels
             string userName = await SecureStorage.GetAsync("user_name") ?? "guest";
             Preferences.Default.Set($"PreferredLanguage_{userName}", langCode); // Ghi nhớ riêng cho tài khoản
             Preferences.Default.Set("PreferredLanguage", langCode); // Cập nhật trạng thái chung để đồng bộ vào Audio Service
+            
+            // Kích nổ sự kiện đổi ngôn ngữ toàn cục trên UI
+            LocalizationManager.Instance.SetLanguage(langCode);
 
             // 2. Đồng bộ lên Server (nếu thất bại cũng không sao vì đã có Local)
             try

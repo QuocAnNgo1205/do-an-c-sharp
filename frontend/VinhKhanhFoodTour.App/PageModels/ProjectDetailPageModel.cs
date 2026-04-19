@@ -88,9 +88,10 @@ namespace VinhKhanhFoodTour.App.PageModels
                     IsFromQr = false; // Tránh tracking 2 lần nếu user refresh lại trang này
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                DisplayDescription = currentPoi.Description ?? "Không thể tải thông tin giới thiệu.";
+                System.Diagnostics.Debug.WriteLine($"[ProjectDetail] Lỗi gọi API LoadPoiDetailsAsync: {ex.Message}");
+                DisplayDescription = currentPoi.Description ?? "Không thể kết nối lấy chi tiết (có thể do lỗi mạng).";
             }
         }
 

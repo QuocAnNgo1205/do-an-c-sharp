@@ -12,6 +12,7 @@ public partial class AppShell : Shell
         // 🔗 Đăng ký Route cho các trang phụ (không nằm trong TabBar)
         Routing.RegisterRoute("RegisterPage", typeof(Pages.RegisterPage));
         Routing.RegisterRoute("ProjectDetailPage", typeof(Pages.ProjectDetailPage));
+        Routing.RegisterRoute("tourdetail", typeof(Pages.TourDetailPage));
 
         // 🛡️ Kiểm tra Login khi App khởi động (bắt đầu từ SplashPage)
         Task.Run(async () => await CheckLoginStatusAsync());
