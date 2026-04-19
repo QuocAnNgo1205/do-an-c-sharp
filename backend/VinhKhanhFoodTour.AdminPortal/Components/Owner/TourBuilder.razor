@@ -15,7 +15,7 @@
     <!-- ── HEADER ── -->
     <div class="tb-header">
         <div>
-            <h1 class="tb-title">🗺️ Tour Builder</h1>
+            <h1 class="tb-title">🗺️ Xây dựng lộ trình</h1>
             <p class="tb-subtitle">Xây dựng lộ trình ẩm thực &amp; theo dõi lượt tham gia</p>
         </div>
         <div class="tb-header-right">
@@ -168,12 +168,12 @@
                                  @ondragover="() => OnDragOver(idx)"
                                  @ondrop="() => OnDrop(idx)">
                                 <div class="tb-stop-num" style="background:@RouteColor(idx)">@(idx+1)</div>
-                                <span class="tb-drag-h">⠿</span>
+                                <span class="tb-drag-h" title="Kéo để sắp xếp">⠿</span>
                                 <div class="tb-stop-info">
                                     <p class="tb-stop-name">@item.Name</p>
                                     @if (item.PopularityScore > 0)
                                     {
-                                        <p class="tb-stop-score">⭐ @item.PopularityScore lượt</p>
+                                        <p class="tb-stop-score">⭐ @item.PopularityScore lượt tương tác</p>
                                     }
                                 </div>
                                 <div class="tb-stop-arrows">
@@ -265,7 +265,7 @@
                             <div class="tb-tour-ft">
                                 <span class="tb-tour-date">📅 @tour.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</span>
                                 <button class="tb-btn-edit" @onclick="() => LoadTourForEdit(tour)">✏️ Sửa</button>
-                                <button class="tb-btn-del" @onclick="() => DeleteTourAsync(tour.Id)">🗑️</button>
+                                <button class="tb-btn-del" title="Xóa tour này" @onclick="() => DeleteTourAsync(tour.Id)">🗑️ Xóa</button>
                             </div>
                         </div>
                     }

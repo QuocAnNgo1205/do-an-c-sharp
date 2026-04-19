@@ -8,48 +8,48 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-3xl font-bold text-gray-800">My Restaurants</h1>
-            <p class="text-gray-600 mt-1">Manage your POI locations and view statistics</p>
+            <h1 class="text-3xl font-bold text-gray-800">Quán ăn của tôi</h1>
+            <p class="text-gray-600 mt-1">Quản lý các địa điểm và xem thống kê của bạn</p>
         </div>
         <button @onclick="ShowAddPoiForm" class="btn btn-primary">
-            📍 Add New Restaurant
+            📍 Thêm quán ăn mới
         </button>
     </div>
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="card">
-            <div class="text-sm text-gray-600 uppercase tracking-wide">Total Restaurants</div>
+            <div class="text-sm text-gray-600 uppercase tracking-wide">Tổng số quán</div>
             <div class="text-3xl font-bold text-blue-600 mt-2">@(Pois?.Count ?? 0)</div>
-            <p class="text-xs text-gray-500 mt-2">@((Pois?.Count ?? 0) == 0 ? "No restaurants yet" : "Managed by you")</p>
+            <p class="text-xs text-gray-500 mt-2">@((Pois?.Count ?? 0) == 0 ? "Chưa có quán nào" : "Đang được bạn quản lý")</p>
         </div>
         <div class="card">
-            <div class="text-sm text-gray-600 uppercase tracking-wide">Approved</div>
+            <div class="text-sm text-gray-600 uppercase tracking-wide">Đã duyệt</div>
             <div class="text-3xl font-bold text-green-600 mt-2">@(Pois?.Count(p => p != null && p.Status == 1) ?? 0)</div>
-            <p class="text-xs text-gray-500 mt-2">Ready to access</p>
+            <p class="text-xs text-gray-500 mt-2">Sẵn sàng để truy cập</p>
         </div>
         <div class="card">
-            <div class="text-sm text-gray-600 uppercase tracking-wide">Pending</div>
+            <div class="text-sm text-gray-600 uppercase tracking-wide">Chờ duyệt</div>
             <div class="text-3xl font-bold text-yellow-600 mt-2">@(Pois?.Count(p => p != null && p.Status == 0) ?? 0)</div>
-            <p class="text-xs text-gray-500 mt-2">Awaiting approval</p>
+            <p class="text-xs text-gray-500 mt-2">Đang chờ Admin phê duyệt</p>
         </div>
     </div>
 
     <!-- Restaurants Table -->
     <div class="card">
         <div class="card-header">
-            <h2 class="text-xl font-bold text-gray-800">Restaurant Listings</h2>
+            <h2 class="text-xl font-bold text-gray-800">Danh sách quán ăn</h2>
         </div>
         
         <div class="table-container">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Coordinates</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th>Actions</th>
+                        <th>Tên quán</th>
+                        <th>Tọa độ</th>
+                        <th>Trạng thái</th>
+                        <th>Ngày tạo</th>
+                        <th>Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -57,7 +57,7 @@
                     {
                         <tr>
                             <td colspan="5" class="text-center py-8 text-gray-500">
-                                Loading restaurants... 
+                                Đang tải danh sách... 
                                 <span class="spinner ml-2">⏳</span>
                             </td>
                         </tr>
@@ -66,7 +66,7 @@
                     {
                         <tr>
                             <td colspan="5" class="text-center py-8 text-gray-500">
-                                No restaurants yet. Click "Add New Restaurant" to get started!
+                                Bạn chưa có quán nào. Hãy nhấn "Thêm quán ăn mới" để bắt đầu!
                             </td>
                         </tr>
                     }
@@ -97,11 +97,11 @@
                                     <div class="flex gap-2">
                                         <button class="text-blue-600 hover:text-blue-800 text-sm font-medium" 
                                                 @onclick="() => ViewPoiDetails(poi)">
-                                            🔍 View
+                                            🔍 Xem
                                         </button>
                                         <button class="text-yellow-600 hover:text-yellow-800 text-sm font-medium" 
                                                 @onclick="() => EditPoi(poi)">
-                                            ✏️ Edit
+                                            ✏️ Sửa
                                         </button>
                                         <button class="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
                                                 title="Tạo QR Code cho món ăn / quán này"
@@ -110,7 +110,7 @@
                                         </button>
                                         <button class="text-red-600 hover:text-red-800 text-sm font-medium" 
                                                 @onclick="() => DeletePoi(poi)">
-                                            🗑️ Delete
+                                            🗑️ Xóa
                                         </button>
                                     </div>
                                 </td>
@@ -122,12 +122,11 @@
         </div>
     </div>
 
-    <!-- Listen Statistics Section -->
     @if (ListenStats?.Count > 0)
     {
         <div class="card">
             <div class="card-header">
-                <h2 class="text-xl font-bold text-gray-800">Narration Listen Statistics</h2>
+                <h2 class="text-xl font-bold text-gray-800">Thống kê lượt nghe thuyết minh</h2>
             </div>
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -147,10 +146,10 @@
     {
         <div class="card">
             <div class="card-header">
-                <h2 class="text-xl font-bold text-gray-800">Narration Listen Statistics</h2>
+                <h2 class="text-xl font-bold text-gray-800">Thống kê lượt nghe thuyết minh</h2>
             </div>
             <div class="p-8 text-center text-gray-500">
-                <p>No statistics available yet. Create a restaurant and wait for approvals!</p>
+                <p>Chưa có dữ liệu thống kê. Hãy tạo quán và chờ phê duyệt nhé!</p>
             </div>
         </div>
     }
@@ -384,9 +383,9 @@
 
     private string GetStatusText(int status) => status switch
     {
-        1 => "Approved",
-        0 => "Pending",
-        2 => "Rejected",
-        _ => "Unknown"
+        1 => "Đã duyệt",
+        0 => "Đang chờ",
+        2 => "Bị từ chối",
+        _ => "Không xác định"
     };
 }

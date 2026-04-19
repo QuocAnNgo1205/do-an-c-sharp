@@ -238,4 +238,32 @@ public class PoiService : IPoiService
             return new List<QrManageStatDto>();
         }
     }
+
+    public async Task<List<HeatmapPointDto>> GetUserHeatmapPointsAsync()
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<HeatmapPointDto>>("api/v1/Poi/user-heatmap");
+            return result ?? new List<HeatmapPointDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching user heatmap points: {ex.Message}");
+            return new List<HeatmapPointDto>();
+        }
+    }
+
+    public async Task<bool> SeedUserLocationsAsync()
+    {
+        try
+        {
+            await _apiClient.PostAsync<object>("api/v1/Poi/seed-user-locations", new { });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error seeding user locations: {ex.Message}");
+            return false;
+        }
+    }
 }

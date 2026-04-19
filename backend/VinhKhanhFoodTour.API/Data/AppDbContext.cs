@@ -19,6 +19,7 @@ namespace VinhKhanhFoodTour.Data
         public DbSet<Tour> Tours { get; set; } = null!;
         public DbSet<TourPoi> TourPois { get; set; } = null!;
         public DbSet<TourUsageLog> TourUsageLogs { get; set; } = null!;
+        public DbSet<UserLocationLog> UserLocationLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -151,6 +152,17 @@ namespace VinhKhanhFoodTour.Data
                     .WithMany(t => t.UsageLogs)
                     .HasForeignKey(ul => ul.TourId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ============== UserLocationLog Configuration ==============
+            modelBuilder.Entity<UserLocationLog>(entity =>
+            {
+                entity.HasKey(l => l.Id);
+                entity.Property(l => l.DeviceId).IsRequired().HasMaxLength(255);
+                entity.Property(l => l.Timestamp).HasDefaultValueSql("GETUTCDATE()");
+                
+                entity.HasIndex(l => l.Timestamp);
+                entity.HasIndex(l => l.DeviceId);
             });
         }
     }

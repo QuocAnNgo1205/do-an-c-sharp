@@ -83,13 +83,27 @@ public class ApiService
             }
 
             var pois = await response.Content.ReadFromJsonAsync<List<Poi>>();
+            if (pois != null)
+            {
+                foreach (var p in pois) p.ImageUrl = FormatImageUrl(p.ImageUrl);
+            }
             Debug.WriteLine($"[API] ✓ Retrieved {pois?.Count ?? 0} POIs");
             return pois ?? new List<Poi>();
+        }
+        catch (OperationCanceledException)
+        {
+            if (showErrorAlert)
+                await ShowErrorAlert("⏱️ Hết Thời Chờ", 
+                    $"Không nhận được phản hồi từ Backend ({BaseAddress}) sau 15 giây.\n\n" +
+                    "HƯỚNG DẪN SỬA:\n" +
+                    "1. Kiểm tra Backend có đang chạy không.\n" +
+                    "2. Kiểm tra IP trong Data/Constants.cs có khớp với IP máy tính bạn không (dùng lệnh ipconfig).");
+            return null;
         }
         catch (HttpRequestException ex) when (ex.InnerException is TimeoutException)
         {
             if (showErrorAlert)
-                await ShowErrorAlert("⏱️ Hết Thời Chờ", "Backend không phản hồi trong 15 giây. Kiểm tra kết nối mạng và xác nhận Backend đang chạy.");
+                await ShowErrorAlert("⏱️ Hết Thời Chờ", "Lỗi kết nối mạng hoặc Backend không phản hồi.");
             return null;
         }
         catch (HttpRequestException ex)
@@ -97,7 +111,7 @@ public class ApiService
             Debug.WriteLine($"[API ERROR] Network error: {ex.Message}");
             if (showErrorAlert)
                 await ShowErrorAlert("🔌 Lỗi Mạng", 
-                    $"Không kết nối được tới Backend ({BaseAddress}). Chi tiết: {ex.Message}");
+                    $"Không kết nối được tới Backend ({BaseAddress}).");
             return null;
         }
         catch (Exception ex)
@@ -155,13 +169,37 @@ public class ApiService
             }
 
             var poi = await response.Content.ReadFromJsonAsync<Poi>();
+            if (poi != null)
+            {
+                poi.ImageUrl = FormatImageUrl(poi.ImageUrl);
+                if (poi.Translations != null)
+                {
+                    foreach (var t in poi.Translations)
+                    {
+                        t.ImageUrl = FormatImageUrl(t.ImageUrl);
+                        // Bonus: Format audio path if it's relative
+                        if (!string.IsNullOrEmpty(t.AudioFilePath) && !t.AudioFilePath.StartsWith("http"))
+                        {
+                             var baseUri = new Uri(BaseAddress);
+                             var host = $"{baseUri.Scheme}://{baseUri.Host}:{baseUri.Port}";
+                             t.AudioFilePath = $"{host.TrimEnd('/')}/{t.AudioFilePath.TrimStart('/')}";
+                        }
+                    }
+                }
+            }
             Debug.WriteLine($"[API] ✓ Retrieved POI detail with {poi?.Translations?.Count ?? 0} translations");
             return poi;
+        }
+        catch (OperationCanceledException)
+        {
+            if (showErrorAlert)
+                await ShowErrorAlert("⏱️ Hết Thời Chờ", "Không thể tải chi tiết quán sau 15 giây. Vui lòng kiểm tra lại kết nối tới Backend.");
+            return null;
         }
         catch (HttpRequestException ex) when (ex.InnerException is TimeoutException)
         {
             if (showErrorAlert)
-                await ShowErrorAlert("⏱️ Hết Thời Chờ", "Backend không phản hồi trong 15 giây.");
+                await ShowErrorAlert("⏱️ Hết Thời Chờ", "Backend không phản hồi.");
             return null;
         }
         catch (HttpRequestException ex)
@@ -180,8 +218,69 @@ public class ApiService
         }
     }
 
+    // ──────────────────────────────────────────────────────────
+    // ENDPOINT 3: Lấy danh sách Tours công khai
+    // ──────────────────────────────────────────────────────────
+    public async Task<List<Tour>?> GetToursAsync(bool showErrorAlert = true)
+    {
+        try
+        {
+            Debug.WriteLine($"[API] GET /Tour/public");
+            await SetAuthHeaderAsync();
+            var response = await _httpClient.GetAsync("Tour/public");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                if (showErrorAlert)
+                    await HandleErrorResponse(response, "Lấy danh sách Tour");
+                return null;
+            }
+
+            var tours = await response.Content.ReadFromJsonAsync<List<Tour>>();
+            if (tours != null)
+            {
+                foreach (var t in tours)
+                {
+                    t.ImageUrl = FormatImageUrl(t.ImageUrl);
+                    if (t.Pois != null)
+                    {
+                        foreach (var p in t.Pois) p.PoiImageUrl = FormatImageUrl(p.PoiImageUrl);
+                    }
+                }
+            }
+            Debug.WriteLine($"[API] ✓ Retrieved {tours?.Count ?? 0} Tours");
+            return tours ?? new List<Tour>();
+        }
+        catch (OperationCanceledException)
+        {
+            if (showErrorAlert)
+                await ShowErrorAlert("⏱️ Hết Thời Chờ", "Không thể tải danh sách Tour sau 15 giây.");
+            return null;
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is TimeoutException)
+        {
+            if (showErrorAlert)
+                await ShowErrorAlert("⏱️ Hết Thời Chờ", "Backend không phản hồi.");
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            Debug.WriteLine($"[API ERROR] Network error: {ex.Message}");
+            if (showErrorAlert)
+                await ShowErrorAlert("🔌 Lỗi Mạng", $"Không cấu nối được server Tour: {ex.Message}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[API ERROR] Unexpected error: {ex}");
+            if (showErrorAlert)
+                await ShowErrorAlert("❌ Lỗi Bất Ngờ", $"Đã xảy ra lỗi khi tải Tour: {ex.Message}");
+            return null;
+        }
+    }
+
     // ====================================================================
-    // ENDPOINT 3: Gửi dữ liệu lên Server (Analytics, Logging, v.v.)
+    // ENDPOINT 4: Gửi dữ liệu lên Server (Analytics, Logging, v.v.)
     // ====================================================================
     /// <summary>
     /// Gửi dữ liệu POST tới Backend (ví dụ: Log lượt nghe)
@@ -262,8 +361,29 @@ public class ApiService
     }
 
     // ====================================================================
-    // TIỆN ÍCH: Hàm xử lý lỗi Server
+    // TIỆN ÍCH: Hàm xử lý lỗi Server và Định dạng URL ảnh
     // ====================================================================
+    
+    /// <summary>
+    /// Đảm bảo URL ảnh luôn có đủ scheme và host để Glide tải được.
+    /// Nếu backend trả về đường dẫn tương đối (ví dụ: media/abc.jpg), 
+    /// hàm này sẽ tự động gắn thêm BaseAddress.
+    /// </summary>
+    private string FormatImageUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url)) return "";
+
+        // Nếu đã là URL tuyệt đối (bắt đầu bằng http hoặc https) -> Trả về luôn
+        if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            return url;
+
+        // Nếu là đường dẫn tương đối -> Gắn thêm BaseAddress
+        var baseUri = new Uri(BaseAddress);
+        var host = $"{baseUri.Scheme}://{baseUri.Host}:{baseUri.Port}";
+        
+        return $"{host.TrimEnd('/')}/{url.TrimStart('/')}";
+    }
+
     private async Task HandleErrorResponse(HttpResponseMessage response, string context)
     {
         string errorMessage = context;

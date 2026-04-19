@@ -20,10 +20,14 @@
                             @onclick='() => ChangeMapMode("Pin")'>
                         📍 Bản đồ Ghim
                     </button>
-                    <button class="@(MapMode == "Heatmap" ? "bg-white shadow-sm font-medium text-orange-600" : "text-gray-500 hover:text-gray-700") px-4 py-1.5 rounded-md text-sm transition-all flex items-center gap-1"
-                            @onclick='() => ChangeMapMode("Heatmap")'>
-                        🔥 Bản đồ Nhiệt (Lượt nghe)
-                    </button>
+                    
+                    @if (AuthState?.IsAdmin == true)
+                    {
+                        <button class="@(MapMode == "Heatmap" ? "bg-white shadow-sm font-medium text-orange-600" : "text-gray-500 hover:text-gray-700") px-4 py-1.5 rounded-md text-sm transition-all flex items-center gap-1"
+                                @onclick='() => ChangeMapMode("Heatmap")'>
+                            🔥 Bản đồ Nhiệt (Vị trí thực tế)
+                        </button>
+                    }
                 </div>
 
                 <!-- Legends cho Bản đồ Ghim -->
@@ -45,14 +49,33 @@
                 </div>
             }
 
+            @if (MapMode == "Heatmap" && !HeatmapPoints.Any() && !IsLoading)
+            {
+                <div class="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-white shadow-lg rounded-lg p-4 border border-orange-200 flex items-center gap-4">
+                    <div class="text-orange-600">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span class="font-medium ml-2">Không có dữ liệu nhiệt trong 24h qua.</span>
+                    </div>
+                    <button class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm transition-colors flex items-center gap-2"
+                            @onclick="HandleSeedData">
+                        <i class="fas fa-magic"></i>
+                        Tạo dữ liệu mẫu ngay
+                    </button>
+                </div>
+            }
+
             <div id="overview-map" class="w-full h-full min-h-[600px] z-10"></div>
         </div>
     </div>
 </ProtectedRoute>
 
 @code {
+    [CascadingParameter]
+    private VinhKhanhFoodTour.AdminPortal.Services.Auth.AuthState? AuthState { get; set; }
+
     private bool IsLoading = true;
     private List<OverviewMapPinDto> Pins = new();
+    private List<HeatmapPointDto> HeatmapPoints = new();
     private bool _isMapInitialized = false;
     private string MapMode = "Pin"; // "Pin" or "Heatmap"
 
@@ -83,7 +106,15 @@
 
     private async Task ChangeMapMode(string mode)
     {
-        if (MapMode == mode) return; // Không vẽ lại nếu đang ở chế độ đó
+        if (MapMode == mode) return; 
+        
+        // Anti-role bypass check
+        if (mode == "Heatmap" && AuthState?.IsAdmin != true)
+        {
+            MapMode = "Pin";
+            return;
+        }
+
         MapMode = mode;
         await RenderMapAsync();
     }
@@ -98,12 +129,51 @@
             }
             else if (MapMode == "Heatmap")
             {
-                await JSRuntime.InvokeVoidAsync("leafletMapInterop.renderHeatmap", "overview-map", Pins);
+                IsLoading = true;
+                StateHasChanged();
+                
+                try 
+                {
+                    HeatmapPoints = await PoiService.GetUserHeatmapPointsAsync();
+                }
+                finally
+                {
+                    IsLoading = false;
+                    StateHasChanged();
+                }
+
+                await JSRuntime.InvokeVoidAsync("leafletMapInterop.renderUserHeatmap", "overview-map", HeatmapPoints, Pins);
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Map render error: {ex.Message}");
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleSeedData()
+    {
+        IsLoading = true;
+        StateHasChanged();
+        try
+        {
+            var success = await PoiService.SeedUserLocationsAsync();
+            if (success)
+            {
+                HeatmapPoints = await PoiService.GetUserHeatmapPointsAsync();
+                await RenderMapAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Seed error: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
         }
     }
 }

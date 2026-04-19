@@ -21,6 +21,9 @@ namespace VinhKhanhFoodTour.App.Services
         // Lưu vết thời gian phát audio cuối cùng cho mỗi POI để tránh spam
         private readonly Dictionary<int, DateTime> _lastPlayedPois = new();
         private List<Poi>? _allPois;
+        
+        // Guard: Tránh hiện nhiều popup xác nhận đồng thời khi GPS cập nhật liên tục
+        private bool _isShowingConfirmation = false;
 
         public GeofenceManager(
             ILocationTrackingService locationService, 
@@ -59,9 +62,17 @@ namespace VinhKhanhFoodTour.App.Services
                     }
                 }
 
-                // NẾU ĐANG PHÁT AUDIO THÌ KHÔNG LÀM PHIỀN
+                // NẾU ĐANG PHÁT AUDIO -> HIỆN THÔNG BÁO XÁC NHẬN
                 if (_audioService.IsPlaying)
                 {
+                    var userLocationPlaying = new Location(e.Latitude, e.Longitude);
+                    var poiCandidate = FindClosestEligiblePoi(userLocationPlaying);
+                    
+                    if (poiCandidate != null)
+                    {
+                        // Đã tìm thấy quán mới khi đang nghe quán cũ -> Hỏi ý kiến
+                        _ = ShowConfirmationAndQueueAsync(poiCandidate);
+                    }
                     return;
                 }
 
@@ -147,6 +158,79 @@ namespace VinhKhanhFoodTour.App.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Geofence ERROR] {ex.Message}");
+            }
+        }
+
+        private Poi? FindClosestEligiblePoi(Location userLocation)
+        {
+            Poi? closestPoi = null;
+            double minDistance = double.MaxValue;
+
+            foreach (var poi in _allPois ?? new List<Poi>())
+            {
+                if (poi.Latitude == 0 || poi.Longitude == 0) continue;
+
+                var poiLocation = new Location(poi.Latitude, poi.Longitude);
+                double distanceKm = userLocation.CalculateDistance(poiLocation, DistanceUnits.Kilometers);
+                double distanceMeters = distanceKm * 1000;
+
+                if (distanceMeters <= TRIGGER_RADIUS_METERS && CanPlayAudio(poi.Id))
+                {
+                    if (distanceMeters < minDistance)
+                    {
+                        minDistance = distanceMeters;
+                        closestPoi = poi;
+                    }
+                }
+            }
+            return closestPoi;
+        }
+
+        private async Task ShowConfirmationAndQueueAsync(Poi poi)
+        {
+            // Guard 1: Tránh hiện nhiều popup cho cùng 1 quán
+            _lastPlayedPois[poi.Id] = DateTime.UtcNow;
+
+            // Guard 2: Tránh 2+ popup xác nhận chồng nhau khi GPS cập nhật liên tục
+            if (_isShowingConfirmation) 
+            {
+                // Đang có popup khác mở -> đưa thẳng vào hàng chờ không hỏi
+                Debug.WriteLine($"[Geofence] 📥 Another dialog open. Auto-queuing: {poi.Name}");
+                _audioService.EnqueuePoi(poi);
+                return;
+            }
+
+            _isShowingConfirmation = true;
+            try
+            {
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    var currentPage = Application.Current?.Windows.FirstOrDefault()?.Page;
+                    if (currentPage == null) return;
+
+                    string title = "🎯 Bạn đã đến quán mới!";
+                    string message = $"Bạn đang ở gần [{poi.Name}]. Bạn có muốn nghe thuyết minh về quán này ngay không?";
+                    string accept = "Nghe ngay";
+                    string cancel = "Để sau (Vào hàng chờ)";
+
+                    bool playNow = await currentPage.DisplayAlertAsync(title, message, accept, cancel);
+
+                    if (playNow)
+                    {
+                        Debug.WriteLine($"[Geofence] 🚀 User chose PLAY NOW for {poi.Name}");
+                        await _audioService.StopAudioAsync();
+                        await _audioService.PlayAudioAsync(poi);
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[Geofence] 📥 User chose QUEUE for {poi.Name}");
+                        _audioService.EnqueuePoi(poi);
+                    }
+                });
+            }
+            finally
+            {
+                _isShowingConfirmation = false;
             }
         }
 

@@ -171,6 +171,7 @@ namespace VinhKhanhFoodTour.API.Controllers
             {
                 PoiId = request.PoiId,
                 DeviceId = request.DeviceId,
+                ListenDurationSeconds = request.ListenDurationSeconds ?? 0,
                 Timestamp = request.Timestamp ?? DateTime.UtcNow
             };
             _context.NarrationLogs.Add(log);

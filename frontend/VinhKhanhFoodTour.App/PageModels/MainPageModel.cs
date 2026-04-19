@@ -66,9 +66,9 @@ namespace VinhKhanhFoodTour.App.PageModels
                         Restaurants.Clear();
                         foreach (var item in cached) Restaurants.Add(item);
                         UpdateChartData();
-                        UpdateMockToursData();
                     });
                     _ = UpdateDistancesAsync();
+                    _ = UpdateToursDataAsync();
                 }
 
                 // 🌐 BƯỚC 2: Gọi API để lấy dữ liệu mới nhất (chạy ngầm)
@@ -92,9 +92,9 @@ namespace VinhKhanhFoodTour.App.PageModels
                         Restaurants.Clear();
                         foreach (var item in data) Restaurants.Add(item);
                         UpdateChartData();
-                        UpdateMockToursData();
                     });
                     _ = UpdateDistancesAsync();
+                    _ = UpdateToursDataAsync();
                 }
             }
             catch (Exception ex)
@@ -154,41 +154,27 @@ namespace VinhKhanhFoodTour.App.PageModels
             catch { }
         }
 
-        private void UpdateMockToursData()
+        private async Task UpdateToursDataAsync()
         {
-            if (ToursList.Count > 0) return; // Đã có data rồi thì khỏi load lại
-
-            var allPoiIds = Restaurants.Select(r => r.Id).ToList();
-
-            ToursList.Add(new Tour
+            try
             {
-                Id = 1,
-                Title = "Grill & Neon Lights",
-                NumberOfStops = 5,
-                Duration = "85",
-                ImageUrl = "https://images.unsplash.com/photo-1555939594-58d7cb561ad1",
-                PoiIds = allPoiIds.Take(5).ToList() // Lấy 5 quán đầu làm Tour thịt nướng
-            });
-
-            ToursList.Add(new Tour
+                var tours = await _apiService.GetToursAsync(showErrorAlert: false);
+                if (tours != null && tours.Count > 0)
+                {
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        ToursList.Clear();
+                        foreach (var t in tours)
+                        {
+                            ToursList.Add(t);
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
             {
-                Id = 2,
-                Title = "The Street Food Fusion",
-                NumberOfStops = 4,
-                Duration = "60",
-                ImageUrl = "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38",
-                PoiIds = allPoiIds.Skip(3).Take(4).ToList() // Trộn 4 quán ngẫu nhiên
-            });
-
-            ToursList.Add(new Tour
-            {
-                Id = 3,
-                Title = "Hẻm Ốc Đêm Sài Thành",
-                NumberOfStops = 6,
-                Duration = "120",
-                ImageUrl = "https://images.unsplash.com/photo-1549488344-c102df0827f3",
-                PoiIds = allPoiIds.OrderBy(x => Guid.NewGuid()).Take(6).ToList()
-            });
+                System.Diagnostics.Debug.WriteLine($"[MainPage] Lỗi load Tours: {ex.Message}");
+            }
         }
 
         // --- TÍNH NĂNG MỚI: THUYẾT MINH ĐỒNG BỘ ---

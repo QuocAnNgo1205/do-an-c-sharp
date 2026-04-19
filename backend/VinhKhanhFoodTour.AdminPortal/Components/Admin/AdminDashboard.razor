@@ -7,23 +7,144 @@
         <!-- Header -->
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
-                <p class="text-gray-600 mt-1">System status and POI approval queue</p>
+                <h1 class="text-3xl font-bold text-gray-800">Bảng điều khiển Admin</h1>
+                <p class="text-gray-600 mt-1">Trạng thái hệ thống và Hàng đợi phê duyệt POI</p>
             </div>
             <button @onclick="RefreshData" class="btn btn-secondary" disabled="@IsLoadingPois">
-                🔄 Refresh
+                🔄 Làm mới
             </button>
         </div>
+
+        @if (IsLoadingStats)
+        {
+            <div class="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                <div class="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                <p class="text-gray-500 font-medium">Đang tổng hợp dữ liệu hệ thống...</p>
+            </div>
+        }
+        else
+        {
+            <!-- Summary Stats -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-2xl">🏢</div>
+                    <div>
+                        <p class="text-2xl font-bold text-gray-900">@(_stats.Count)</p>
+                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Tổng POI</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-2xl">📻</div>
+                    <div>
+                        <p class="text-2xl font-bold text-gray-900">@(_stats.Sum(s => s.ListenCount))</p>
+                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Lượt nghe</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-2xl">📷</div>
+                    <div>
+                        <p class="text-2xl font-bold text-gray-900">@(_stats.Sum(s => s.QrScanCount))</p>
+                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Lượt quét QR</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-2xl">📈</div>
+                    <div>
+                        <p class="text-2xl font-bold text-gray-900">@(_trend.Sum(t => t.Count))</p>
+                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Tăng trưởng tháng</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-gray-800">📊 Biểu đồ lượt nghe toàn hệ thống</h2>
+                    </div>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="admin-main-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- NEW: Average duration summary or Top POIs -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4">⏱️ Hiệu quả nội dung</h2>
+                    <div class="flex-1 flex flex-col justify-center items-center text-center">
+                        @{
+                            var totalDuration = _stats.Sum(s => s.AvgListenTime * s.ListenCount);
+                            var totalListens = _stats.Sum(s => s.ListenCount);
+                            var globalAvg = totalListens > 0 ? totalDuration / totalListens : 0;
+                            var globalMins = (int)(globalAvg / 60);
+                            var globalSecs = (int)(globalAvg % 60);
+                        }
+                        <div class="text-5xl font-black text-blue-600 mb-2">
+                            @($"{globalMins:D2}:{globalSecs:D2}")
+                        </div>
+                        <p class="text-gray-500 font-medium mb-6">Thời gian nghe TB toàn hệ thống</p>
+                        
+                        <div style="height: 180px; width: 100%; position: relative;">
+                            @if (!_stats.Any())
+                            {
+                                <div class="text-gray-400 italic text-sm">Chưa có dữ liệu</div>
+                            }
+                            else 
+                            {
+                                <canvas id="duration-analytics-chart"></canvas>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW: Detailed Analytics Table -->
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">📈 Chi tiết hiệu suất từng địa điểm</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-gray-50">
+                                <th class="pb-3 text-xs font-semibold text-gray-400 uppercase">Tên quán</th>
+                                <th class="pb-3 text-xs font-semibold text-gray-400 uppercase text-center">Lượt nghe</th>
+                                <th class="pb-3 text-xs font-semibold text-gray-400 uppercase text-center">Quét QR</th>
+                                <th class="pb-3 text-xs font-semibold text-gray-400 uppercase text-right">TG nghe TB</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            @foreach (var stat in _stats.OrderByDescending(s => s.ListenCount).Take(10))
+                            {
+                                <tr>
+                                    <td class="py-4 font-medium text-gray-800">@stat.PoiName</td>
+                                    <td class="py-4 text-center text-gray-600">@stat.ListenCount</td>
+                                    <td class="py-4 text-center text-gray-600">@stat.QrScanCount</td>
+                                    <td class="py-4 text-right">
+                                        @{
+                                            var m = (int)(stat.AvgListenTime / 60);
+                                            var s = (int)(stat.AvgListenTime % 60);
+                                            <span class="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold">
+                                                @($"{m:D2}:{s:D2}")
+                                            </span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
 
         <!-- Section 2: Pending POIs Approval Queue -->
         <div class="card">
             <div class="card-header">
                 <div class="flex items-center justify-between">
                     <h2 class="text-lg font-bold text-gray-800">
-                        📋 Pending POIs Approval Queue
+                        📋 Hàng đợi phê duyệt địa điểm (POI)
                     </h2>
                     <span class="badge badge-warning">
-                        @(PendingPois?.Count ?? 0) Pending
+                        @(PendingPois?.Count ?? 0) Đang chờ
                     </span>
                 </div>
             </div>
@@ -33,9 +154,9 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Name</th>
-                            <th>Coordinates</th>
-                            <th>Actions</th>
+                            <th>Tên quán</th>
+                            <th>Tọa độ</th>
+                            <th>Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -44,7 +165,7 @@
                             <tr>
                                 <td colspan="4" class="text-center py-8 text-gray-500">
                                     <div class="spinner-dot mx-auto mb-3"></div>
-                                    Loading pending POIs...
+                                    Đang tải danh sách chờ...
                                 </td>
                             </tr>
                         }
@@ -52,7 +173,7 @@
                         {
                             <tr>
                                 <td colspan="4" class="text-center py-8 text-gray-500">
-                                    ✅ No pending POIs! All submissions have been reviewed.
+                                    ✅ Tuyệt vời! Không có quán nào đang chờ duyệt.
                                 </td>
                             </tr>
                         }
@@ -120,6 +241,12 @@
     [Inject]
     private ILogger<AdminDashboard>? Logger { get; set; }
 
+    [Inject]
+    private VinhKhanhFoodTour.AdminPortal.Services.Http.ApiClient ApiClient { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
     private Notifications? NotificationComponent { get; set; }
     private RejectPoiModal? RejectModal { get; set; }
 
@@ -129,6 +256,11 @@
     private bool IsApproving = false;
     private bool _isInitialized = false;
 
+    private List<PoiAnalyticsStat> _stats = new();
+    private List<MonthlyPoint>     _trend  = new();
+    private bool IsLoadingStats = true;
+    private bool _chartRendered = false;
+
     protected override async Task OnInitializedAsync()
     {
         if (_isInitialized) return;
@@ -136,7 +268,7 @@
 
         try
         {
-            await LoadDataAsync();
+            await Task.WhenAll(LoadDataAsync(), LoadAnalyticsAsync());
         }
         catch (Exception ex)
         {
@@ -146,13 +278,44 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!IsLoadingStats && !_chartRendered && _trend.Any())
+        {
+            _chartRendered = true;
+            await Task.Delay(300); 
+            
+            // Chart 1: Monthly Trend
+            var labels = _trend.Select(t => t.Label).ToArray();
+            var data   = _trend.Select(t => t.Count).ToArray();
+            await JS.InvokeVoidAsync("poiAnalyticsChart.render", "admin-main-chart", labels, data);
+
+            // Chart 2: Average Duration (Top 5 POIs)
+            var topPois = _stats.OrderByDescending(s => s.AvgListenTime).Take(5).ToList();
+            var durationLabels = topPois.Select(s => s.PoiName).ToArray();
+            var durationData   = topPois.Select(s => s.AvgListenTime).ToArray();
+            await JS.InvokeVoidAsync("durationAnalyticsChart.render", "duration-analytics-chart", durationLabels, durationData);
+        }
+    }
+
+    private async Task LoadAnalyticsAsync()
+    {
         try
         {
-            await base.OnAfterRenderAsync(firstRender);
+            IsLoadingStats = true;
+            var result = await ApiClient.GetAsync<PoiAnalyticsResponse>("api/v1/Poi/analytics");
+            if (result is not null)
+            {
+                _stats = result.PoiStats;
+                _trend = result.MonthlyTrend;
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Exception in AdminDashboard OnAfterRenderAsync: {ex}");
+            Logger?.LogError($"Error loading analytics: {ex.Message}");
+        }
+        finally
+        {
+            IsLoadingStats = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -170,13 +333,14 @@
             Logger?.LogError($"Error loading admin dashboard data: {ex.Message}");
             NotificationComponent?.ShowNotification(
                 "Lỗi",
-                "Không thể tải dữ liệu dashboard. Vui lòng thử lại.",
+                "Không thể tải dữ liệu Dashboard. Vui lòng thử lại.",
                 Notifications.NotificationType.Error
             );
         }
         finally
         {
             IsLoadingPois = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -248,5 +412,23 @@
         );
     }
 
-
+    // --- DTOs ---
+    private class PoiAnalyticsResponse
+    {
+        public List<PoiAnalyticsStat> PoiStats { get; set; } = new();
+        public List<MonthlyPoint> MonthlyTrend { get; set; } = new();
+    }
+    private class PoiAnalyticsStat
+    {
+        public int PoiId { get; set; }
+        public string PoiName { get; set; } = string.Empty;
+        public int ListenCount { get; set; }
+        public int QrScanCount { get; set; }
+        public double AvgListenTime { get; set; }
+    }
+    private class MonthlyPoint
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
 }

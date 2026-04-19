@@ -23,6 +23,10 @@ public class AudioGuideService
     private IAudioPlayer? _activePlayer;
     private bool _isPlaying = false;
     private CancellationTokenSource? _playingCancellation;
+    
+    // Hàng chờ phát thuyết minh
+    private readonly Queue<Poi> _playbackQueue = new();
+    private bool _isProcessingQueue = false;
 
     // Mutex chống spam nút gẫy bộ nhớ
     private readonly SemaphoreSlim _playLock = new SemaphoreSlim(1, 1);
@@ -45,6 +49,55 @@ public class AudioGuideService
 
     public bool IsPlaying => _isPlaying;
     public int? CurrentPlayingPoiId => _currentPlayingPoiId;
+    public int QueueCount => _playbackQueue.Count;
+
+    /// <summary>
+    /// Thêm POI vào hàng chờ phát.
+    /// Nếu đang không phát gì, sẽ tự động bắt đầu hàng chờ.
+    /// </summary>
+    public void EnqueuePoi(Poi poi)
+    {
+        if (poi == null) return;
+        
+        // Nếu đã có trong hàng chờ hoặc đang phát chính nó -> Bỏ qua tránh lặp
+        if (_currentPlayingPoiId == poi.Id || _playbackQueue.Any(p => p.Id == poi.Id))
+            return;
+
+        _playbackQueue.Enqueue(poi);
+        Debug.WriteLine($"[AudioGuide] ➕ Enqueued: {poi.Name}. Queue size: {_playbackQueue.Count}");
+
+        // Nếu đang không phát, kích hoạt xử lý hàng chờ
+        if (!_isPlaying && !_isProcessingQueue)
+        {
+            _ = ProcessQueueAsync();
+        }
+    }
+
+    private async Task ProcessQueueAsync()
+    {
+        // Guard: Nếu đang trong vòng lặp xử lý hàng chờ rồi thì thoát để tránh 2 luồng chạy song song
+        if (_isProcessingQueue) return;
+        _isProcessingQueue = true;
+
+        try
+        {
+            // Không kiểm tra !_isPlaying trong while vì PlayAudioAsync sẽ tự đợi lock
+            // Vòng lặp chỉ thoát khi hàng chờ trống hoặc bị xóa (StopAudioAsync)
+            while (_playbackQueue.Count > 0)
+            {
+                var nextPoi = _playbackQueue.Dequeue();
+                Debug.WriteLine($"[AudioGuide] ⏭️ Next from queue: {nextPoi.Name}");
+                await PlayAudioAsync(nextPoi);
+                
+                // Kiểm tra nếu hàng chờ bị xóa giữa chừng (người dùng nhấn Dừng)
+                // _playbackQueue.Count sẽ là 0 sau StopAudioAsync() → while tự thoát
+            }
+        }
+        finally
+        {
+            _isProcessingQueue = false;
+        }
+    }
 
     /// <summary>
     /// Phát âm thanh cho POI với logic Fallback 3 Lớp hoàn chỉnh
@@ -85,11 +138,15 @@ public class AudioGuideService
                     _activePlayer = _audioManager.CreatePlayer(audioUrl);
                     _activePlayer.PlaybackEnded += (s, e) =>
                     {
-                        MainThread.BeginInvokeOnMainThread(() =>
+                        MainThread.BeginInvokeOnMainThread(async () =>
                         {
                             _isPlaying = false;
                             onStateChanged?.Invoke(false);
                             PlaybackStateChanged?.Invoke(this, (poi.Id, false));
+                            
+                            // Tự động kiểm tra hàng chờ khi kết thúc
+                            await Task.Delay(1000); // Nghỉ 1s giữa 2 quán
+                            _ = ProcessQueueAsync();
                         });
                     };
                     _activePlayer.Play();
@@ -188,6 +245,10 @@ public class AudioGuideService
 
             onStateChanged?.Invoke(false);
             _ = LogListenAsync(poi.Id);
+
+            // TTS kết thúc (SpeakAsync đã hoàn thành) -> Kiểm tra hàng chờ
+            await Task.Delay(1000);
+            _ = ProcessQueueAsync();
         }
         catch (OperationCanceledException)
         {
@@ -312,7 +373,10 @@ public class AudioGuideService
                 _currentPlayingPoiId = null;
             }
 
-            Debug.WriteLine("[AudioGuide] ⏹️ All audio stopped");
+            // Xoá hàng chờ khi người dùng bấm Dừng thủ công
+            _playbackQueue.Clear();
+
+            Debug.WriteLine("[AudioGuide] ⏹️ All audio stopped and queue cleared");
         }
         catch (Exception ex)
         {

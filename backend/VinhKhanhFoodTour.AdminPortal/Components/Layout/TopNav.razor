@@ -32,9 +32,9 @@
     {
         return AuthState?.CurrentUser?.Role switch
         {
-            "Owner" => "My Restaurants",
-            "Admin" => "Approve Restaurants",
-            _ => "Dashboard"
+            "Owner" => "Quán của tôi",
+            "Admin" => "Phê duyệt địa điểm",
+            _ => "Bảng điều khiển"
         };
     }
 }

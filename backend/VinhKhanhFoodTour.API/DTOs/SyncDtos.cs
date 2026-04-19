@@ -23,6 +23,7 @@ namespace VinhKhanhFoodTour.DTOs
     {
         public int PoiId { get; set; }
         public string DeviceId { get; set; } = string.Empty;
+        public int? ListenDurationSeconds { get; set; }
         public DateTime? Timestamp { get; set; }
     }
 

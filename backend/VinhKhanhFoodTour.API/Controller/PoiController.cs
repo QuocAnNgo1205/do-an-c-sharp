@@ -19,13 +19,15 @@ namespace VinhKhanhFoodTour.API.Controllers
         private readonly IMediaService _mediaService;
         private readonly ISyncOrchestrator _syncOrchestrator;
         private readonly AppDbContext _db;
+        private readonly ILogger<PoiController> _logger;
 
-        public PoiController(IPoiService poiService, IMediaService mediaService, ISyncOrchestrator syncOrchestrator, AppDbContext db)
+        public PoiController(IPoiService poiService, IMediaService mediaService, ISyncOrchestrator syncOrchestrator, AppDbContext db, ILogger<PoiController> logger)
         {
             _poiService = poiService;
             _mediaService = mediaService;
             _syncOrchestrator = syncOrchestrator;
             _db = db;
+            _logger = logger;
         }
 
 
@@ -155,21 +157,22 @@ namespace VinhKhanhFoodTour.API.Controllers
                     return Unauthorized(new { Message = "Không thể xác định người dùng." });
                 }
 
-                // 🔴 DEBUG: Log nhận dữ liệu
-                Console.WriteLine($"[CreatePoi] Received: Name={name}, ImageFile={imageFile?.FileName}, ImageFile.Length={imageFile?.Length}");
+                // Ghi log nhận dữ liệu
+                _logger.LogDebug("[CreatePoi] Received: Name={Name}, ImageFile={ImageFile}, ImageFile.Length={ImageLength}",
+                    name, imageFile?.FileName, imageFile?.Length);
 
-                // 🔴 MỚI: Xử lý upload ảnh nếu có
+                // Xử lý upload ảnh nếu có
                 string? imageUrl = null;
                 if (imageFile != null && imageFile.Length > 0)
                 {
-                    Console.WriteLine($"[CreatePoi] Processing image: {imageFile.FileName} ({imageFile.Length} bytes)");
+                    _logger.LogDebug("[CreatePoi] Processing image: {FileName} ({Length} bytes)", imageFile.FileName, imageFile.Length);
                     var (savedImageUrl, _) = await _mediaService.SaveMediaAsync(imageFile, null);
                     imageUrl = savedImageUrl;
-                    Console.WriteLine($"[CreatePoi] Image saved as: {imageUrl}");
+                    _logger.LogDebug("[CreatePoi] Image saved as: {ImageUrl}", imageUrl);
                 }
                 else
                 {
-                    Console.WriteLine("[CreatePoi] No image file provided");
+                    _logger.LogDebug("[CreatePoi] No image file provided");
                 }
 
                 // Tạo CreatePoiDto với ImageUrl
@@ -183,11 +186,11 @@ namespace VinhKhanhFoodTour.API.Controllers
                     ImageUrl = imageUrl
                 };
 
-                Console.WriteLine($"[CreatePoi] CreatePoiDto prepared with ImageUrl={poiDto.ImageUrl}");
+                _logger.LogDebug("[CreatePoi] CreatePoiDto prepared with ImageUrl={ImageUrl}", poiDto.ImageUrl);
 
                 var newPoi = await _poiService.CreateOwnerPoiAsync(ownerId, poiDto);
 
-                Console.WriteLine($"[CreatePoi] POI created: Id={newPoi.Id}, ImageUrl={newPoi.ImageUrl}");
+                _logger.LogDebug("[CreatePoi] POI created: Id={Id}, ImageUrl={ImageUrl}", newPoi.Id, newPoi.ImageUrl);
 
                 return CreatedAtAction(nameof(CreatePoi), new { id = newPoi.Id }, new { Message = "Đã tạo quán ăn thành công! Chờ Admin duyệt.", Id = newPoi.Id, ImageUrl = imageUrl });
             }
@@ -534,7 +537,10 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
-                var isAdmin = User.IsInRole("Admin");
+                // Robust admin check
+                var isAdmin = User.IsInRole("Admin") || 
+                              User.Claims.Any(c => (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
+
                 var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
                 int? ownerId = null;
                 if (!isAdmin && int.TryParse(userIdStr, out var uId))
@@ -548,7 +554,13 @@ namespace VinhKhanhFoodTour.API.Controllers
 
                 var narrationCounts = await narrationQuery
                     .GroupBy(n => new { n.PoiId, n.Poi!.Name })
-                    .Select(g => new { g.Key.PoiId, g.Key.Name, Count = g.Count() })
+                    .Select(g => new 
+                    { 
+                        g.Key.PoiId, 
+                        g.Key.Name, 
+                        Count = g.Count(),
+                        AvgDuration = g.Average(x => x.ListenDurationSeconds)
+                    })
                     .ToListAsync();
 
                 // Filter QR Scan Logs
@@ -568,12 +580,17 @@ namespace VinhKhanhFoodTour.API.Controllers
                     .Select(p => new { p.Id, p.Name })
                     .ToListAsync();
 
-                var poiStats = allPois.Select(p => new
+                var poiStats = allPois.Select(p => 
                 {
-                    poiId       = p.Id,
-                    poiName     = p.Name,
-                    listenCount = narrationCounts.FirstOrDefault(n => n.PoiId == p.Id)?.Count ?? 0,
-                    qrScanCount = qrCounts.FirstOrDefault(q => q.PoiId == p.Id)?.Count ?? 0
+                    var nStat = narrationCounts.FirstOrDefault(n => n.PoiId == p.Id);
+                    return new
+                    {
+                        poiId = p.Id,
+                        poiName = p.Name,
+                        listenCount = nStat?.Count ?? 0,
+                        qrScanCount = qrCounts.FirstOrDefault(q => q.PoiId == p.Id)?.Count ?? 0,
+                        avgListenTime = nStat?.AvgDuration ?? 0
+                    };
                 })
                 .OrderByDescending(x => x.listenCount + x.qrScanCount)
                 .ToList();
@@ -675,6 +692,119 @@ namespace VinhKhanhFoodTour.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Message = "Lỗi khi lấy dữ liệu QR hệ thống: " + ex.Message });
+            }
+        }
+        // POST /api/v1/Poi/user-location
+        [HttpPost("user-location")]
+        [AllowAnonymous]
+        public async Task<IActionResult> PostUserLocation([FromBody] UserLocationRequest request)
+        {
+            try
+            {
+                var log = new UserLocationLog
+                {
+                    DeviceId = request.DeviceId,
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
+                    CurrentTourId = request.CurrentTourId,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                _db.UserLocationLogs.Add(log);
+                await _db.SaveChangesAsync();
+                return Ok(new { Message = "Location recorded." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Error recording location: " + ex.Message });
+            }
+        }
+
+        // GET /api/v1/Poi/user-heatmap
+        [HttpGet("user-heatmap")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetUserHeatmap()
+        {
+            try
+            {
+                // Get last 24h location data for heatmap
+                var cutoff = DateTime.UtcNow.AddHours(-24);
+                var points = await _db.UserLocationLogs
+                    .Where(l => l.Timestamp >= cutoff)
+                    .Select(l => new HeatmapPointDto
+                    {
+                        Lat = l.Latitude,
+                        Lng = l.Longitude,
+                        Intensity = 1.0
+                    })
+                    .ToListAsync();
+
+                return Ok(points);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Error fetching heatmap data: " + ex.Message });
+            }
+        }
+
+        // POST /api/v1/Poi/seed-user-locations
+        [HttpPost("seed-user-locations")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> SeedUserLocations()
+        {
+            try
+            {
+                // Clear existing logs
+                _db.UserLocationLogs.RemoveRange(_db.UserLocationLogs);
+                await _db.SaveChangesAsync();
+
+                var random = new Random();
+                var logs = new List<UserLocationLog>();
+                var pois = await _db.Pois.ToListAsync();
+
+                if (pois.Any())
+                {
+                    // Seeding logic (concentrated around POIs as requested)
+                    foreach (var poi in pois)
+                    {
+                        int crowdSize = random.Next(20, 40);
+                        for (int i = 0; i < crowdSize; i++)
+                        {
+                            logs.Add(new UserLocationLog
+                            {
+                                DeviceId = $"Tourist-{poi.Id}-{i}",
+                                Latitude = poi.Latitude + (random.NextDouble() - 0.5) * 0.001,
+                                Longitude = poi.Longitude + (random.NextDouble() - 0.5) * 0.001,
+                                Timestamp = DateTime.UtcNow.AddMinutes(-random.Next(5, 120))
+                            });
+                        }
+                    }
+
+                    // Vinh Khanh street walkers
+                    for (int j = 0; j < 50; j++)
+                    {
+                        double ratio = random.NextDouble();
+                        double midLat = pois[0].Latitude + (pois[1].Latitude - pois[0].Latitude) * ratio;
+                        double midLng = pois[0].Longitude + (pois[1].Longitude - pois[0].Longitude) * ratio;
+
+                        logs.Add(new UserLocationLog
+                        {
+                            DeviceId = $"Walker-{j}",
+                            Latitude = midLat + (random.NextDouble() - 0.5) * 0.0006,
+                            Longitude = midLng + (random.NextDouble() - 0.5) * 0.0006,
+                            Timestamp = DateTime.UtcNow.AddMinutes(-random.Next(0, 60))
+                        });
+                    }
+                }
+
+                _db.UserLocationLogs.AddRange(logs);
+                await _db.SaveChangesAsync();
+
+                return Ok(new { Message = "Heatmap data seeded sample successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Error seeding heatmap: " + ex.Message });
             }
         }
     }

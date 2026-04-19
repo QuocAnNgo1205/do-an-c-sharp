@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using VinhKhanhFoodTour.Data;
@@ -12,9 +13,11 @@ using VinhKhanhFoodTour.Data;
 namespace VinhKhanhFoodTour.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260419144025_AddListenDuration")]
+    partial class AddListenDuration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -51,7 +54,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("PoiId");
 
-                    b.ToTable("NarrationLogs", (string)null);
+                    b.ToTable("NarrationLogs");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.Poi", b =>
@@ -110,7 +113,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Pois", (string)null);
+                    b.ToTable("Pois");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.PoiTranslation", b =>
@@ -147,7 +150,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("PoiId");
 
-                    b.ToTable("PoiTranslations", (string)null);
+                    b.ToTable("PoiTranslations");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.QrScanLog", b =>
@@ -175,7 +178,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("PoiId");
 
-                    b.ToTable("QrScanLogs", (string)null);
+                    b.ToTable("QrScanLogs");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.Role", b =>
@@ -193,7 +196,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("Roles");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.Tour", b =>
@@ -226,7 +229,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Tours", (string)null);
+                    b.ToTable("Tours");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.TourPoi", b =>
@@ -244,7 +247,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("PoiId");
 
-                    b.ToTable("TourPois", (string)null);
+                    b.ToTable("TourPois");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.TourUsageLog", b =>
@@ -271,7 +274,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("TourId");
 
-                    b.ToTable("TourUsageLogs", (string)null);
+                    b.ToTable("TourUsageLogs");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.User", b =>
@@ -310,7 +313,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.UserLocationLog", b =>
@@ -346,7 +349,7 @@ namespace VinhKhanhFoodTour.API.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.ToTable("UserLocationLogs", (string)null);
+                    b.ToTable("UserLocationLogs");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.NarrationLog", b =>

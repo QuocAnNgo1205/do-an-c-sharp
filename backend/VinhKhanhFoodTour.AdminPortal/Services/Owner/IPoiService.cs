@@ -68,6 +68,16 @@ public interface IPoiService
     /// Get QR management statistics for the whole system (Admin only)
     /// </summary>
     Task<List<QrManageStatDto>> GetAdminQrStatsAsync();
+
+    /// <summary>
+    /// Get user location heatmap points (Admin only)
+    /// </summary>
+    Task<List<HeatmapPointDto>> GetUserHeatmapPointsAsync();
+
+    /// <summary>
+    /// Force regenerate heatmap sample data (Admin only)
+    /// </summary>
+    Task<bool> SeedUserLocationsAsync();
 }
 
 public class PoiDto
@@ -145,4 +155,11 @@ public class QrManageStatDto
     public string PoiName { get; set; } = string.Empty;
     public int UniqueScanCount { get; set; }
     public int TotalScanCount { get; set; }
+}
+
+public class HeatmapPointDto
+{
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    public double Intensity { get; set; }
 }

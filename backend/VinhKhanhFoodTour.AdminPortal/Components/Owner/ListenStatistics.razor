@@ -7,8 +7,8 @@
         <!-- Header -->
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">Listen Statistics</h1>
-                <p class="text-gray-600 mt-1">Leaderboard of narration engagements for your restaurants.</p>
+                <h1 class="text-3xl font-bold text-gray-800">Thống kê tương tác</h1>
+                <p class="text-gray-600 mt-1">Bảng xếp hạng mức độ tương tác với các quán ăn của bạn.</p>
             </div>
             <div class="flex items-center gap-4">
                 <!-- Mode Switcher -->
@@ -24,7 +24,7 @@
                 </div>
 
                 <button @onclick="LoadStatisticsAsync" class="btn btn-secondary" disabled="@IsLoading">
-                    🔄 Refresh
+                    🔄 Làm mới
                 </button>
             </div>
         </div>
@@ -70,14 +70,14 @@
                 {
                     <div class="text-center py-8 text-gray-500">
                         <div class="spinner-dot mx-auto mb-3"></div>
-                        Loading statistics...
+                        Đang tải thống kê...
                     </div>
                 }
                 else if (ListenStats == null || ListenStats.Count == 0)
                 {
                     <div class="text-center py-8 text-gray-500">
-                        <p class="text-lg">No playback statistics found.</p>
-                        <p class="text-sm mt-2">Make sure your restaurants are approved and have narrations uploaded.</p>
+                        <p class="text-lg">Chưa tìm thấy dữ liệu tương tác nào.</p>
+                        <p class="text-sm mt-2">Vui lòng đảm bảo các quán ăn của bạn đã được duyệt và có file thuyết minh.</p>
                     </div>
                 }
                 else
@@ -103,9 +103,9 @@
                                 <!-- Progress Bar Container -->
                                 <div class="flex-1">
                                     <div class="flex justify-between mb-1">
-                                        <span class="font-medium text-gray-800">@(stat.PoiName ?? "Unknown Restaurant")</span>
+                                        <span class="font-medium text-gray-800">@(stat.PoiName ?? "Không rõ tên quán")</span>
                                         <span class="font-bold @(StatMode == "listen" ? "text-blue-600" : "text-green-600")">
-                                            @stat.ListenCount <span class="text-xs font-normal text-gray-500">@(StatMode == "listen" ? "lượt nghe" : "lượt quét")</span>
+                                            @stat.ListenCount <span class="text-xs font-normal text-gray-500">@(StatMode == "listen" ? "lượt nghe" : "thiết bị quét")</span>
                                         </span>
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">

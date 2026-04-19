@@ -191,6 +191,76 @@ window.leafletMapInterop = {
         if (bounds.length > 0) {
             this.map.fitBounds(bounds, { padding: [30, 30] });
         }
+    },
+
+    /**
+     * Renders a heatmap based on raw GPS points (User positions)
+     * OVERLAYS restaurant pins for context.
+     * @param {string} elementId 
+     * @param {Array} points - Array of {lat, lng, intensity}
+     * @param {Array} markersData - Optional POI pins to show
+     */
+    renderUserHeatmap: function (elementId, points, markersData) {
+        if (this.map) {
+            this.map.remove();
+        }
+
+        this.map = L.map(elementId).setView([10.7600, 106.6961], 15);
+
+        // Nền tối cho Heatmap
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(this.map);
+
+        setTimeout(() => {
+            if(window.leafletMapInterop.map) {
+                window.leafletMapInterop.map.invalidateSize();
+            }
+        }, 200);
+
+        // 1. Render POI Pins first (if provided)
+        if (markersData && markersData.length > 0) {
+            var orangeIcon = new L.Icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                iconSize: [18, 30], iconAnchor: [9, 30], popupAnchor: [1, -25], shadowSize: [30, 30]
+            });
+
+            markersData.forEach(m => {
+                L.marker([m.latitude, m.longitude], {icon: orangeIcon, opacity: 0.7})
+                 .bindPopup(`<small>${m.name}</small>`)
+                 .addTo(this.map);
+            });
+        }
+
+        // 2. Render Heat Layer
+        if (!points || points.length === 0) {
+            return;
+        }
+
+        var heatPoints = points.map(p => [p.lat, p.lng, p.intensity || 1.0]);
+        
+        L.heatLayer(heatPoints, {
+            radius: 30,
+            blur: 20,
+            maxZoom: 15,
+            max: 1.0,
+            gradient: {
+                0.2: 'blue', 
+                0.4: 'cyan', 
+                0.6: 'lime', 
+                0.8: 'yellow', 
+                1.0: 'red'
+            }
+        }).addTo(this.map);
+
+        // Auto-zoom to fit the heatmap points
+        var bounds = points.map(p => [p.lat, p.lng]);
+        if (bounds.length > 0) {
+            this.map.fitBounds(bounds, { padding: [40, 40] });
+        }
     }
 };
 

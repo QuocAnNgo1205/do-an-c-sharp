@@ -75,7 +75,7 @@ namespace VinhKhanhFoodTour.API.Controllers
             return Ok(new
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
-                Role = user.Role.RoleName,
+                Role = user.Role?.RoleName ?? "Tourist", // CS8602 fix: null-safe access
                 Username = user.Username,
                 Email = user.Email ?? "Chưa cập nhật email",
                 Expiration = token.ValidTo

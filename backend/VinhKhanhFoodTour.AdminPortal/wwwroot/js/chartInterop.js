@@ -139,3 +139,63 @@ window.poiAnalyticsChart = {
     }
 };
 
+/* ── Duration Analytics Bar Chart ── */
+window.durationAnalyticsChart = {
+    _chart: null,
+    render: function (elementId, labels, data) {
+        var el = document.getElementById(elementId);
+        if (!el) return;
+        if (this._chart) { this._chart.destroy(); this._chart = null; }
+
+        var ctx = el.getContext('2d');
+        var grad = ctx.createLinearGradient(0, 0, 0, 300);
+        grad.addColorStop(0, 'rgba(16,185,129,0.85)'); // Emerald-500
+        grad.addColorStop(1, 'rgba(5,150,105,0.4)');
+
+        this._chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'TG nghe trung bình',
+                    data: data,
+                    backgroundColor: grad,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Biểu đồ ngang cho dễ đọc tên quán
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15,23,42,0.92)',
+                        callbacks: {
+                            label: function(context) {
+                                var val = context.parsed.x;
+                                var m = Math.floor(val / 60);
+                                var s = Math.floor(val % 60);
+                                return 'Trung bình: ' + m + ':' + (s < 10 ? '0' + s : s);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color:'#f1f5f9' },
+                        ticks: {
+                            callback: function(value) {
+                                var m = Math.floor(value / 60);
+                                return m + 'ph';
+                            }
+                        }
+                    },
+                    y: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+};

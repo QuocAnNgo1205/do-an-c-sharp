@@ -8,6 +8,12 @@ namespace VinhKhanhFoodTour.Data
     {
         public static void Initialize(AppDbContext context)
         {
+            // Seed User Locations for Heatmap
+            SeedUserLocations(context);
+
+            // Seed Narration Logs with duration data
+            SeedNarrationLogs(context);
+
             // 1. Kiểm tra nếu đã có dữ liệu POI thì không chạy lại nữa
             if (context.Pois.Any()) return;
 
@@ -18,7 +24,7 @@ namespace VinhKhanhFoodTour.Data
             context.Roles.AddRange(adminRole, ownerRole, touristRole);
             context.SaveChanges();
 
-            // 3. Tạo User (Hash mật khẩu bằng BCrypt để khớp với logic Auth mới)
+            // 3. Tạo User (Hash mật khẩu bằng BCrypt)
             var adminUser = new User 
             { 
                 Username = "admin", 
@@ -48,7 +54,6 @@ namespace VinhKhanhFoodTour.Data
                 {
                     Name = "Ốc Oanh",
                     Status = PoiStatus.Approved,
-                    // Tọa độ chuẩn cho SQL Server xử lý bản đồ
                     Location = new Point(106.702081, 10.760193) { SRID = 4326 },
                     TriggerRadius = 20.0,
                     OwnerId = ownerOanhUser.Id,
@@ -72,28 +77,105 @@ namespace VinhKhanhFoodTour.Data
             context.Pois.AddRange(pois);
             context.SaveChanges();
 
-            // 5. Tạo Translations (Thuyết minh đa ngôn ngữ)
+            // 5. Tạo Translations
             var translations = new PoiTranslation[]
             {
                 new PoiTranslation
                 {
-                    PoiId = pois[0].Id, // Ốc Oanh
+                    PoiId = pois[0].Id,
                     LanguageCode = "vi",
                     Title = "Ốc Oanh Vinh Khánh",
-                    Description = "Nhà hàng ốc nổi tiếng tại quận 4, thành phố Hồ Chí Minh. Phục vụ các món ốc tươi sống với hương vị đặc sắc.",
+                    Description = "Nhà hàng ốc nổi tiếng tại quận 4, thành phố Hồ Chí Minh.",
                     ImageUrl = "https://images.foody.vn/res/g1/476/prof/foody-mobile-oc-oanh-vinh-khanh-avatar-804-63799651234567890.jpg"
                 },
                 new PoiTranslation
                 {
-                    PoiId = pois[1].Id, // Ốc Vũ
+                    PoiId = pois[1].Id,
                     LanguageCode = "vi",
                     Title = "Ốc Vũ Vinh Khánh",
-                    Description = "Quán ốc uy tín chuyên các loại ốc tươi sống, không gian thoáng mát tại đường Vinh Khánh.",
+                    Description = "Quán ốc uy tín chuyên các loại ốc tươi sống tại đường Vinh Khánh.",
                     ImageUrl = "https://vcdn1-dulich.vnecdn.net/2021/11/24/1-1637745123.jpg"
                 }
             };
 
             context.PoiTranslations.AddRange(translations);
+            context.SaveChanges();
+        }
+
+        private static void SeedUserLocations(AppDbContext context)
+        {
+            if (context.UserLocationLogs.Any()) return;
+
+            var random = new Random();
+            var logs = new List<UserLocationLog>();
+            
+            // Lấy danh sách POI để rải người dùng xung quanh quán
+            var pois = context.Pois.ToList();
+            if (!pois.Any()) return;
+
+            // 1. Rải người dùng CỰC KỲ TẬP TRUNG quanh mỗi quán ăn (Hotspots)
+            foreach (var poi in pois)
+            {
+                int crowdSize = random.Next(15, 30);
+                for (int i = 0; i < crowdSize; i++)
+                {
+                    logs.Add(new UserLocationLog
+                    {
+                        DeviceId = $"Tourist-{poi.Id}-{i}",
+                        // Rải trong bán kính rất hẹp (khoảng 20-30m)
+                        Latitude = poi.Latitude + (random.NextDouble() - 0.5) * 0.0005,
+                        Longitude = poi.Longitude + (random.NextDouble() - 0.5) * 0.0005,
+                        Timestamp = DateTime.UtcNow.AddMinutes(-random.Next(5, 120))
+                    });
+                }
+            }
+
+            // 2. Rải thêm một ít người đi bộ dọc theo trục đường Vĩnh Khánh (giữa các quán)
+            for (int j = 0; j < 40; j++)
+            {
+                // Nội suy ngẫu nhiên giữa Ốc Oanh và Ốc Vũ để tạo cảm giác người đang đi bộ trên phố
+                double ratio = random.NextDouble();
+                double midLat = pois[0].Latitude + (pois[1].Latitude - pois[0].Latitude) * ratio;
+                double midLng = pois[0].Longitude + (pois[1].Longitude - pois[0].Longitude) * ratio;
+
+                logs.Add(new UserLocationLog
+                {
+                    DeviceId = $"Walker-{j}",
+                    Latitude = midLat + (random.NextDouble() - 0.5) * 0.0003,
+                    Longitude = midLng + (random.NextDouble() - 0.5) * 0.0003,
+                    Timestamp = DateTime.UtcNow.AddMinutes(-random.Next(0, 60))
+                });
+            }
+
+            context.UserLocationLogs.AddRange(logs);
+            context.SaveChanges();
+        }
+        private static void SeedNarrationLogs(AppDbContext context)
+        {
+            if (context.NarrationLogs.Any()) return;
+
+            var random = new Random();
+            var pois = context.Pois.ToList();
+            if (!pois.Any()) return;
+
+            var logs = new List<NarrationLog>();
+            foreach (var poi in pois)
+            {
+                // Create between 10 and 20 logs for each POI
+                int count = random.Next(10, 21);
+                for (int i = 0; i < count; i++)
+                {
+                    logs.Add(new NarrationLog
+                    {
+                        PoiId = poi.Id,
+                        DeviceId = $"Device-{random.Next(100, 999)}",
+                        ListenDurationSeconds = random.Next(30, 301), // 30s to 5m
+                        Timestamp = DateTime.UtcNow.AddDays(-random.Next(0, 30))
+                    });
+                }
+            }
+
+            context.NarrationLogs.AddRange(logs);
             context.SaveChanges();
         }
     }

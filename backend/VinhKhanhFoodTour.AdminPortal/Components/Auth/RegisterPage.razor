@@ -12,20 +12,20 @@
         <div class="bg-white rounded-lg shadow-xl p-8">
             <!-- Header -->
             <div class="text-center mb-8">
-                <h1 class="text-3xl font-bold text-gray-800 mb-2">Owner Registration</h1>
-                <p class="text-gray-600 font-medium">Join the Vinh Khanh Food Tour</p>
-                <p class="text-sm text-gray-500 mt-1">Start managing your restaurant narrations</p>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Đăng ký Chủ quán</h1>
+                <p class="text-gray-600 font-medium">Tham gia vào Vinh Khánh Food Tour</p>
+                <p class="text-sm text-gray-500 mt-1">Bắt đầu quản lý thuyết minh quán ăn của bạn</p>
             </div>
 
             <!-- Register Form -->
             <form @onsubmit="HandleRegisterAsync">
                 <!-- Username -->
                 <div class="mb-5">
-                    <label class="block text-gray-700 font-semibold mb-2">Username</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Tên đăng nhập</label>
                     <input 
                         type="text" 
                         @bind="Username"
-                        placeholder="Choose a username"
+                        placeholder="Chọn tên đăng nhập"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                         disabled="@IsLoading"
                         required
@@ -34,11 +34,11 @@
 
                 <!-- Email -->
                 <div class="mb-5">
-                    <label class="block text-gray-700 font-semibold mb-2">Email Address</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Địa chỉ Email</label>
                     <input 
                         type="email" 
                         @bind="Email"
-                        placeholder="your@email.com"
+                        placeholder="email@cua-ban.com"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                         disabled="@IsLoading"
                         required
@@ -47,11 +47,11 @@
 
                 <!-- Password -->
                 <div class="mb-5">
-                    <label class="block text-gray-700 font-semibold mb-2">Password</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Mật khẩu</label>
                     <input 
                         type="password" 
                         @bind="Password"
-                        placeholder="Create a password"
+                        placeholder="Tạo mật khẩu của bạn"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                         disabled="@IsLoading"
                         required
@@ -60,11 +60,11 @@
 
                 <!-- Confirm Password -->
                 <div class="mb-6">
-                    <label class="block text-gray-700 font-semibold mb-2">Confirm Password</label>
+                    <label class="block text-gray-700 font-semibold mb-2">Xác nhận mật khẩu</label>
                     <input 
                         type="password" 
                         @bind="ConfirmPassword"
-                        placeholder="Repeat your password"
+                        placeholder="Nhập lại mật khẩu"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
                         disabled="@IsLoading"
                         required
@@ -75,7 +75,7 @@
                 @if (!string.IsNullOrEmpty(ErrorMessage))
                 {
                     <div class="mb-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded shadow-sm">
-                        <p class="font-bold">Registration Failed</p>
+                        <p class="font-bold">Đăng ký không thành công</p>
                         <p class="text-sm">@ErrorMessage</p>
                     </div>
                 }
@@ -90,21 +90,21 @@
                     {
                         <div class="flex items-center justify-center gap-2">
                             <span class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-                            <span>Creating Account...</span>
+                            <span>Đang tạo tài khoản...</span>
                         </div>
                     }
                     else
                     {
-                        <span>Register Account</span>
+                        <span>Đăng ký tài khoản</span>
                     }
                 </button>
             </form>
 
             <!-- Back to Login -->
             <div class="mt-8 pt-6 border-t border-gray-100 text-center">
-                <p class="text-gray-600 mb-2">Already have an account?</p>
+                <p class="text-gray-600 mb-2">Đã có tài khoản?</p>
                 <a href="/login" class="text-blue-600 hover:text-blue-800 font-semibold transition underline decoration-2 underline-offset-4">
-                    Back to Login
+                    Quay lại Đăng nhập
                 </a>
             </div>
         </div>

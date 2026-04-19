@@ -11,10 +11,10 @@
         <div class="min-h-screen flex items-center justify-center bg-gray-100">
             <div class="text-center">
                 <h1 class="text-4xl font-bold text-gray-800 mb-4">403</h1>
-                <p class="text-xl text-gray-600 mb-6">You don't have permission to access this page.</p>
-                <p class="text-gray-600 mb-6">Your role is: <strong>@(AuthState.CurrentUser?.Role ?? "Unknown")</strong></p>
+                <p class="text-xl text-gray-600 mb-6">Bạn không có quyền truy cập vào trang này.</p>
+                <p class="text-gray-600 mb-6">Vai trò hiện tại của bạn là: <strong>@(AuthState.CurrentUser?.Role ?? "Không xác định")</strong></p>
                 <a href="/" class="inline-block px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Back to Dashboard
+                    Quay lại Bảng điều khiển
                 </a>
             </div>
         </div>
@@ -24,10 +24,10 @@ else
 {
     <div class="min-h-screen flex items-center justify-center bg-gray-100">
         <div class="text-center">
-            <h1 class="text-4xl font-bold text-gray-800 mb-4">Unauthorized</h1>
-            <p class="text-xl text-gray-600 mb-6">Please log in to access this page.</p>
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">Chưa đăng nhập</h1>
+            <p class="text-xl text-gray-600 mb-6">Vui lòng đăng nhập để truy cập trang này.</p>
             <a href="/login" class="inline-block px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                Go to Login
+                Đi tới Đăng nhập
             </a>
         </div>
     </div>

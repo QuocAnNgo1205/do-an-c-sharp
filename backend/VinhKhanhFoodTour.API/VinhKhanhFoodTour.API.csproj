@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -27,6 +27,13 @@
 
   <ItemGroup>
     <Folder Include="wwwroot\" />
+  </ItemGroup>
+
+  <!-- Loại thư mục scratch (debug scripts) ra khỏi build để tránh CS7022 warning -->
+  <ItemGroup>
+    <Compile Remove="scratch\**" />
+    <Content Remove="scratch\**" />
+    <None Include="scratch\**" />
   </ItemGroup>
 
 </Project>

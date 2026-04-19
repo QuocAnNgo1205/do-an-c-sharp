@@ -70,8 +70,15 @@ public class ApiClient
     {
         try
         {
-            await AttachTokenAsync();
-            var response = await _httpClient.GetAsync(endpoint);
+            var token = await _localStorage.GetItemAsync<string>(AuthTokenKey);
+            
+            var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await _httpClient.SendAsync(request);
             return await HandleResponseAsync<T>(response);
         }
         catch (HttpRequestException ex)
@@ -88,13 +95,17 @@ public class ApiClient
     {
         try
         {
-            await AttachTokenAsync();
-            var content = new StringContent(
-                JsonSerializer.Serialize(body),
-                Encoding.UTF8,
-                "application/json");
+            var token = await _localStorage.GetItemAsync<string>(AuthTokenKey);
+            
+            var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+            
+            request.Content = JsonContent.Create(body);
 
-            var response = await _httpClient.PostAsync(endpoint, content);
+            var response = await _httpClient.SendAsync(request);
             return await HandleResponseAsync<T>(response);
         }
         catch (HttpRequestException ex)

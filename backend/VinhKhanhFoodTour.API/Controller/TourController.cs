@@ -18,6 +18,12 @@ namespace VinhKhanhFoodTour.API.Controllers
             _context = context;
         }
 
+        private string GetBaseUrl()
+        {
+            var request = HttpContext.Request;
+            return $"{request.Scheme}://{request.Host}{request.PathBase}";
+        }
+
         // ──────────────────────────────────────────────────────────
         // GET /api/v1/Poi/builder-pool?sortBy=popularity|name
         // POI pool for the Tour Builder, sorted by engagement
@@ -103,6 +109,7 @@ namespace VinhKhanhFoodTour.API.Controllers
         {
             try
             {
+                var baseUrl = GetBaseUrl();
                 var tours = await _context.Tours
                     .Include(t => t.TourPois)
                         .ThenInclude(tp => tp.Poi)
@@ -114,7 +121,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                         Title = t.Title,
                         Description = t.Description,
                         EstimatedPrice = t.EstimatedPrice,
-                        ThumbnailUrl = t.ThumbnailUrl,
+                        ThumbnailUrl = string.IsNullOrEmpty(t.ThumbnailUrl) ? "" : (t.ThumbnailUrl.StartsWith("http") ? t.ThumbnailUrl : baseUrl.TrimEnd('/') + "/" + t.ThumbnailUrl.TrimStart('/')),
                         CreatedAt = t.CreatedAt,
                         UsageCount = t.UsageLogs.Count,
                         Pois = t.TourPois.OrderBy(tp => tp.OrderIndex).Select(tp => new TourPoiResponseDto
@@ -122,7 +129,7 @@ namespace VinhKhanhFoodTour.API.Controllers
                             PoiId = tp.PoiId,
                             OrderIndex = tp.OrderIndex,
                             PoiName = tp.Poi != null ? tp.Poi.Name : string.Empty,
-                            PoiImageUrl = tp.Poi != null ? tp.Poi.ImageUrl : null,
+                            PoiImageUrl = tp.Poi != null && !string.IsNullOrEmpty(tp.Poi.ImageUrl) ? (tp.Poi.ImageUrl.StartsWith("http") ? tp.Poi.ImageUrl : baseUrl.TrimEnd('/') + "/" + tp.Poi.ImageUrl.TrimStart('/')) : null,
                             Latitude = tp.Poi != null ? tp.Poi.Latitude : 0,
                             Longitude = tp.Poi != null ? tp.Poi.Longitude : 0
                         }).ToList()
@@ -134,6 +141,49 @@ namespace VinhKhanhFoodTour.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Message = "Lỗi khi lấy danh sách tour: " + ex.Message });
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────
+        // GET /api/v1/Tour/public — Public endpoint for Mobile App
+        // ──────────────────────────────────────────────────────────
+        [HttpGet("public")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPublicTours()
+        {
+            try
+            {
+                var baseUrl = GetBaseUrl();
+                var tours = await _context.Tours
+                    .Include(t => t.TourPois)
+                        .ThenInclude(tp => tp.Poi)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .Select(t => new TourResponseDto
+                    {
+                        Id = t.Id,
+                        Title = t.Title,
+                        Description = t.Description,
+                        EstimatedPrice = t.EstimatedPrice,
+                        ThumbnailUrl = string.IsNullOrEmpty(t.ThumbnailUrl) ? "" : (t.ThumbnailUrl.StartsWith("http") ? t.ThumbnailUrl : baseUrl.TrimEnd('/') + "/" + t.ThumbnailUrl.TrimStart('/')),
+                        CreatedAt = t.CreatedAt,
+                        UsageCount = t.UsageLogs.Count,
+                        Pois = t.TourPois.Where(tp => tp.Poi != null && tp.Poi.Status == PoiStatus.Approved).OrderBy(tp => tp.OrderIndex).Select(tp => new TourPoiResponseDto
+                        {
+                            PoiId = tp.PoiId,
+                            OrderIndex = tp.OrderIndex,
+                            PoiName = tp.Poi != null ? tp.Poi.Name : string.Empty,
+                            PoiImageUrl = tp.Poi != null && !string.IsNullOrEmpty(tp.Poi.ImageUrl) ? (tp.Poi.ImageUrl.StartsWith("http") ? tp.Poi.ImageUrl : baseUrl.TrimEnd('/') + "/" + tp.Poi.ImageUrl.TrimStart('/')) : null,
+                            Latitude = tp.Poi != null ? tp.Poi.Latitude : 0,
+                            Longitude = tp.Poi != null ? tp.Poi.Longitude : 0
+                        }).ToList()
+                    })
+                    .ToListAsync();
+
+                return Ok(tours);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi lấy danh sách tour công khai: " + ex.Message });
             }
         }
 
@@ -155,13 +205,14 @@ namespace VinhKhanhFoodTour.API.Controllers
                 if (tour == null)
                     return NotFound(new { Message = "Không tìm thấy tour." });
 
+                var baseUrl = GetBaseUrl();
                 var dto = new TourResponseDto
                 {
                     Id = tour.Id,
                     Title = tour.Title,
                     Description = tour.Description,
                     EstimatedPrice = tour.EstimatedPrice,
-                    ThumbnailUrl = tour.ThumbnailUrl,
+                    ThumbnailUrl = string.IsNullOrEmpty(tour.ThumbnailUrl) ? "" : (tour.ThumbnailUrl.StartsWith("http") ? tour.ThumbnailUrl : baseUrl.TrimEnd('/') + "/" + tour.ThumbnailUrl.TrimStart('/')),
                     CreatedAt = tour.CreatedAt,
                     UsageCount = tour.UsageLogs.Count,
                     Pois = tour.TourPois.OrderBy(tp => tp.OrderIndex).Select(tp => new TourPoiResponseDto
@@ -169,7 +220,9 @@ namespace VinhKhanhFoodTour.API.Controllers
                         PoiId = tp.PoiId,
                         OrderIndex = tp.OrderIndex,
                         PoiName = tp.Poi?.Name ?? string.Empty,
-                        PoiImageUrl = tp.Poi?.ImageUrl,
+                        PoiImageUrl = tp.Poi != null && !string.IsNullOrEmpty(tp.Poi.ImageUrl)
+                            ? (tp.Poi.ImageUrl.StartsWith("http") ? tp.Poi.ImageUrl : baseUrl.TrimEnd('/') + "/" + tp.Poi.ImageUrl.TrimStart('/'))
+                            : null,
                         Latitude = tp.Poi?.Latitude ?? 0,
                         Longitude = tp.Poi?.Longitude ?? 0
                     }).ToList()
