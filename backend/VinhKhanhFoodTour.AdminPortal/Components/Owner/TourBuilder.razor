@@ -1,0 +1,759 @@
+@page "/tour-builder"
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@using VinhKhanhFoodTour.AdminPortal.Services.Auth
+@using VinhKhanhFoodTour.AdminPortal.Models.Tour
+@inject ITourService TourService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+<PageTitle>Tour Builder – Vinh Khánh Food Tour</PageTitle>
+
+<div class="tb">
+
+    <!-- ── HEADER ── -->
+    <div class="tb-header">
+        <div>
+            <h1 class="tb-title">🗺️ Tour Builder</h1>
+            <p class="tb-subtitle">Xây dựng lộ trình ẩm thực &amp; theo dõi lượt tham gia</p>
+        </div>
+        <div class="tb-header-right">
+            @if (!string.IsNullOrWhiteSpace(_successMsg))
+            {
+                <span class="tb-alert tb-alert-ok">✅ @_successMsg</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(_errorMsg))
+            {
+                <span class="tb-alert tb-alert-err">❌ @_errorMsg</span>
+            }
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="tb-loading">
+            <div class="tb-spinner"></div>
+            <p>Đang tải dữ liệu...</p>
+        </div>
+    }
+    else
+    {
+
+        <!-- ── STATS ── -->
+        @if (_existingTours.Count > 0)
+        {
+            <div class="tb-stats">
+                <div class="tb-stat">
+                    <span class="tb-stat-ico">🗺️</span>
+                    <div><p class="tb-stat-val">@_existingTours.Count</p><p class="tb-stat-lbl">Tours hiện có</p></div>
+                </div>
+                <div class="tb-stat">
+                    <span class="tb-stat-ico">👥</span>
+                    <div><p class="tb-stat-val">@_existingTours.Sum(t => t.UsageCount)</p><p class="tb-stat-lbl">Tổng lượt dùng</p></div>
+                </div>
+                <div class="tb-stat">
+                    <span class="tb-stat-ico">🏆</span>
+                    <div>
+                        @{ var top = _existingTours.OrderByDescending(t => t.UsageCount).FirstOrDefault(); }
+                        <p class="tb-stat-val tb-stat-val-sm">@(top?.Title ?? "—")</p>
+                        <p class="tb-stat-lbl">Tour phổ biến nhất</p>
+                    </div>
+                </div>
+                <div class="tb-stat">
+                    <span class="tb-stat-ico">📍</span>
+                    <div><p class="tb-stat-val">@_allPois.Count</p><p class="tb-stat-lbl">Địa điểm khả dụng</p></div>
+                </div>
+            </div>
+        }
+
+        <!-- ── FORM ── -->
+        <div class="tb-card tb-form-card">
+            <h2 class="tb-form-h">@(_editingTourId.HasValue ? "✏️ Chỉnh sửa Tour" : "➕ Tạo Tour Mới")</h2>
+            <div class="tb-form-grid">
+                <div class="tb-fg">
+                    <label>Tên Tour *</label>
+                    <input class="tb-inp" placeholder="Vd: Tour Ăn Vặt Buổi Tối 150k" @bind="_title" />
+                </div>
+                <div class="tb-fg">
+                    <label>Ước tính chi phí (VND)</label>
+                    <input class="tb-inp" type="number" placeholder="150000" @bind="_estimatedPrice" />
+                </div>
+                <div class="tb-fg tb-span2">
+                    <label>Mô tả tour</label>
+                    <textarea class="tb-inp tb-ta" placeholder="Mô tả ngắn về lộ trình..." @bind="_description"></textarea>
+                </div>
+            </div>
+            @if (_editingTourId.HasValue)
+            {
+                <button class="tb-btn-cancel" @onclick="CancelEdit">✕ Hủy chỉnh sửa</button>
+            }
+        </div>
+
+        <!-- ── 3-COLUMN BUILDER ── -->
+        <div class="tb-builder">
+
+            <!-- LEFT: POI Pool -->
+            <div class="tb-panel">
+                <div class="tb-panel-hd">
+                    <h2>📍 Địa Điểm</h2>
+                    <select class="tb-sel" @onchange="OnSortChanged">
+                        <option value="popularity">🔥 Nổi bật nhất</option>
+                        <option value="name">🔤 Tên A→Z</option>
+                    </select>
+                </div>
+                <div class="tb-search">
+                    <input class="tb-inp" placeholder="🔍 Tìm địa điểm..." @bind="_searchTerm" @bind:event="oninput" />
+                </div>
+                <div class="tb-pool">
+                    @foreach (var poi in FilteredPois)
+                    {
+                        var added = _routeItems.Any(r => r.PoiId == poi.Id);
+                        var isHot = poi.PopularityScore >= _hotThreshold;
+                        <div class="tb-poi @(added ? "tb-poi-done" : "")">
+                            <div class="tb-poi-info">
+                                <p class="tb-poi-name">@poi.Name @(isHot ? "🔥" : "")</p>
+                                <p class="tb-poi-meta">⭐@poi.PopularityScore &middot; 📻@poi.NarrationCount &middot; 📷@poi.QrScanCount</p>
+                            </div>
+                            <button class="@(added ? "tb-btn-done" : "tb-btn-add")"
+                                    disabled="@added"
+                                    @onclick="() => AddToRoute(poi)">
+                                @(added ? "✓" : "+ Thêm")
+                            </button>
+                        </div>
+                    }
+                    @if (!FilteredPois.Any())
+                    {
+                        <p class="tb-empty">Không tìm thấy địa điểm phù hợp</p>
+                    }
+                </div>
+            </div>
+
+            <!-- MIDDLE: Route order -->
+            <div class="tb-panel">
+                <div class="tb-panel-hd">
+                    <h2>🛣️ Lộ Trình</h2>
+                    <div class="tb-panel-hd-r">
+                        <span class="tb-badge">@_routeItems.Count điểm</span>
+                        @if (_routeItems.Count >= 2)
+                        {
+                            <button class="tb-btn-smart @(_suggesting ? "tb-pulsing" : "")"
+                                    @onclick="SuggestSmartRouteAsync"
+                                    disabled="@_suggesting">
+                                @(_suggesting ? "⏳" : "🧭") Tuyến thông minh
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (_routeItems.Count == 0)
+                {
+                    <div class="tb-empty-route">
+                        <span>🗺️</span>
+                        <p>Chưa có điểm dừng nào</p>
+                        <small>Chọn địa điểm từ cột trái hoặc bấm vào 🔥 gợi ý</small>
+                    </div>
+                }
+                else
+                {
+                    <div class="tb-route">
+                        @for (int i = 0; i < _routeItems.Count; i++)
+                        {
+                            var item = _routeItems[i];
+                            var idx = i;
+                            <div class="tb-stop @(_draggingIdx == idx ? "tb-dragging" : "")"
+                                 draggable="true"
+                                 @ondragstart="() => OnDragStart(idx)"
+                                 @ondragover:preventDefault="true"
+                                 @ondragover="() => OnDragOver(idx)"
+                                 @ondrop="() => OnDrop(idx)">
+                                <div class="tb-stop-num" style="background:@RouteColor(idx)">@(idx+1)</div>
+                                <span class="tb-drag-h">⠿</span>
+                                <div class="tb-stop-info">
+                                    <p class="tb-stop-name">@item.Name</p>
+                                    @if (item.PopularityScore > 0)
+                                    {
+                                        <p class="tb-stop-score">⭐ @item.PopularityScore lượt</p>
+                                    }
+                                </div>
+                                <div class="tb-stop-arrows">
+                                    <button class="tb-arr" disabled="@(idx == 0)"
+                                            @onclick="() => MoveUp(idx)">▲</button>
+                                    <button class="tb-arr" disabled="@(idx == _routeItems.Count-1)"
+                                            @onclick="() => MoveDown(idx)">▼</button>
+                                </div>
+                                <button class="tb-rm" @onclick="() => RemoveFromRoute(idx)">✕</button>
+                            </div>
+                        }
+                    </div>
+                    <div class="tb-save-area">
+                        <button class="tb-btn-save" @onclick="SaveTourAsync" disabled="@_saving">
+                            @(_saving ? "⏳ Đang lưu..." : (_editingTourId.HasValue ? "💾 Cập nhật" : "💾 Lưu Tour"))
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- RIGHT: Mini-map -->
+            <div class="tb-panel tb-map-panel">
+                <div class="tb-panel-hd">
+                    <h2>🗺️ Bản Đồ Tuyến Đường</h2>
+                </div>
+                @if (_routeItems.Count == 0)
+                {
+                    <div class="tb-map-empty">
+                        <span>📍</span>
+                        <p>Thêm ít nhất 1 địa điểm để xem bản đồ</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="tb-map-wrap">
+                        <div id="tour-route-map" class="tb-leaflet"></div>
+                    </div>
+                    <div class="tb-map-legend">
+                        @for (int i = 0; i < _routeItems.Count; i++)
+                        {
+                            var item = _routeItems[i];
+                            var idx = i;
+                            <div class="tb-legend-row">
+                                <span class="tb-legend-dot" style="background:@RouteColor(idx)">@(idx+1)</span>
+                                <span class="tb-legend-name">@item.Name</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+        </div><!-- end tb-builder -->
+
+        <!-- ── EXISTING TOURS ── -->
+        @if (_existingTours.Count > 0)
+        {
+            <div class="tb-existing">
+                <h2 class="tb-section-h">📋 Các Tour Đã Tạo</h2>
+                <div class="tb-existing-grid">
+                    @foreach (var tour in _existingTours.OrderByDescending(t => t.UsageCount))
+                    {
+                        <div class="tb-tour-card @(tour.UsageCount > 0 ? "tb-tour-active" : "")">
+                            @if (tour.UsageCount > 0)
+                            {
+                                <div class="tb-usage-tag">👥 @tour.UsageCount lượt</div>
+                            }
+                            <div class="tb-tour-hd">
+                                <h3>@tour.Title</h3>
+                                <span class="tb-price">@tour.EstimatedPrice.ToString("N0") đ</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(tour.Description))
+                            {
+                                <p class="tb-tour-desc">@tour.Description</p>
+                            }
+                            @{
+                                var maxU = _existingTours.Max(t => t.UsageCount);
+                                var pct  = maxU > 0 ? (double)tour.UsageCount / maxU * 100 : 0;
+                            }
+                            <div class="tb-usage-row">
+                                <div class="tb-bar-bg"><div class="tb-bar" style="width:@pct.ToString("0")%"></div></div>
+                                <span class="tb-bar-lbl">@tour.UsageCount lượt</span>
+                            </div>
+                            <div class="tb-stops">
+                                @foreach (var p in tour.Pois.OrderBy(p => p.OrderIndex))
+                                {
+                                    <span class="tb-stop-tag">@p.OrderIndex. @p.PoiName</span>
+                                }
+                            </div>
+                            <div class="tb-tour-ft">
+                                <span class="tb-tour-date">📅 @tour.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</span>
+                                <button class="tb-btn-edit" @onclick="() => LoadTourForEdit(tour)">✏️ Sửa</button>
+                                <button class="tb-btn-del" @onclick="() => DeleteTourAsync(tour.Id)">🗑️</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [CascadingParameter] private AuthState? AuthState { get; set; }
+
+    // ── State ──
+    private bool _loading = true, _saving = false, _suggesting = false;
+    private string _title = string.Empty;
+    private string? _description;
+    private decimal _estimatedPrice;
+    private string _searchTerm = string.Empty, _sortBy = "popularity";
+    private string? _successMsg, _errorMsg;
+    private int? _editingTourId;
+
+    // ── Data ──
+    private List<PoiSummaryDto> _allPois = new();
+    private List<TourRouteItem> _routeItems = new();
+    private List<TourDto> _existingTours = new();
+    private List<PoiSummaryDto> _hotPois = new();
+    private int _hotThreshold;
+    private int _draggingIdx = -1;
+
+    private static readonly string[] _colors =
+        ["#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
+
+    private static string RouteColor(int idx) => _colors[idx % _colors.Length];
+
+    private IEnumerable<PoiSummaryDto> FilteredPois =>
+        _allPois.Where(p => string.IsNullOrEmpty(_searchTerm) ||
+                            p.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    // ── Lifecycle ──
+    protected override async Task OnInitializedAsync() => await LoadDataAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_loading && _routeItems.Count > 0)
+            await RenderMiniMapAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JSRuntime.InvokeVoidAsync("tourRouteMap.destroy"); } catch { }
+    }
+
+    // ── Data ──
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _allPois = await TourService.GetPoiPoolAsync(_sortBy);
+        _existingTours = await TourService.GetToursAsync();
+        if (_allPois.Count > 0)
+        {
+            _hotThreshold = (int)_allPois.Average(p => p.PopularityScore);
+            _hotPois = _allPois.OrderByDescending(p => p.PopularityScore).Take(5).ToList();
+        }
+        _loading = false;
+    }
+
+    private async Task OnSortChanged(ChangeEventArgs e)
+    {
+        _sortBy = e.Value?.ToString() ?? "popularity";
+        _allPois = await TourService.GetPoiPoolAsync(_sortBy);
+    }
+
+    // ── Route ──
+    private async Task AddToRoute(PoiSummaryDto poi)
+    {
+        if (_routeItems.Any(r => r.PoiId == poi.Id)) return;
+        _routeItems.Add(new TourRouteItem
+        {
+            PoiId = poi.Id, Name = poi.Name, ImageUrl = poi.ImageUrl,
+            Latitude = poi.Latitude, Longitude = poi.Longitude,
+            PopularityScore = poi.PopularityScore, OrderIndex = _routeItems.Count + 1
+        });
+        RenumberRoute();
+        ClearMessages();
+        await RenderMiniMapAsync();
+    }
+
+    private async Task RemoveFromRouteAsync(int idx)
+    {
+        _routeItems.RemoveAt(idx);
+        RenumberRoute();
+        await RenderMiniMapAsync();
+    }
+
+    private async Task MoveUpAsync(int idx)
+    {
+        if (idx <= 0) return;
+        (_routeItems[idx], _routeItems[idx-1]) = (_routeItems[idx-1], _routeItems[idx]);
+        RenumberRoute();
+        await RenderMiniMapAsync();
+    }
+
+    private async Task MoveDownAsync(int idx)
+    {
+        if (idx >= _routeItems.Count - 1) return;
+        (_routeItems[idx], _routeItems[idx+1]) = (_routeItems[idx+1], _routeItems[idx]);
+        RenumberRoute();
+        await RenderMiniMapAsync();
+    }
+
+    // ── Drag ──
+    private void OnDragStart(int idx) => _draggingIdx = idx;
+    private void OnDragOver(int idx) { }
+    private async Task OnDropAsync(int targetIdx)
+    {
+        if (_draggingIdx < 0 || _draggingIdx == targetIdx) { _draggingIdx = -1; return; }
+        var item = _routeItems[_draggingIdx];
+        _routeItems.RemoveAt(_draggingIdx);
+        _routeItems.Insert(targetIdx, item);
+        _draggingIdx = -1;
+        RenumberRoute();
+        await RenderMiniMapAsync();
+    }
+
+    // ── Smart suggestion ──
+    private async Task SuggestSmartRouteAsync()
+    {
+        if (_routeItems.Count < 2) return;
+        _suggesting = true; ClearMessages();
+        var suggested = await TourService.GetSuggestedRouteAsync(_routeItems.Select(r => r.PoiId).ToList());
+        if (suggested.Count > 0)
+        {
+            var newOrder = suggested.Select(s =>
+            {
+                var ex = _routeItems.FirstOrDefault(r => r.PoiId == s.PoiId);
+                if (ex is not null) { ex.OrderIndex = s.OrderIndex; return ex; }
+                return new TourRouteItem { PoiId = s.PoiId, Name = s.PoiName,
+                    Latitude = s.Latitude, Longitude = s.Longitude,
+                    PopularityScore = s.PopularityScore, OrderIndex = s.OrderIndex };
+            }).ToList();
+            _routeItems = newOrder;
+            _successMsg = "✨ Đã sắp xếp tuyến đường tối ưu!";
+        }
+        else
+        {
+            _errorMsg = "Không thể tính tuyến đường. Kiểm tra kết nối API.";
+        }
+        _suggesting = false;
+        await RenderMiniMapAsync();
+    }
+
+    // ── Map ──
+    private async Task RenderMiniMapAsync()
+    {
+        if (_routeItems.Count == 0) return;
+        try
+        {
+            var waypoints = _routeItems.Select(r => new
+            {
+                orderIndex = r.OrderIndex, name = r.Name,
+                latitude = r.Latitude, longitude = r.Longitude
+            }).ToArray();
+            await JSRuntime.InvokeVoidAsync("tourRouteMap.render", "tour-route-map", waypoints);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TourBuilder] Mini-map error: {ex.Message}");
+        }
+    }
+
+    // ── Helpers ──
+    private void RenumberRoute()
+    {
+        for (int i = 0; i < _routeItems.Count; i++) _routeItems[i].OrderIndex = i + 1;
+    }
+
+    private void ClearMessages() { _successMsg = null; _errorMsg = null; }
+
+    private void ClearForm()
+    {
+        _title = string.Empty; _description = null; _estimatedPrice = 0;
+        _routeItems.Clear(); _editingTourId = null;
+    }
+
+    private void CancelEdit() { ClearForm(); ClearMessages(); }
+
+    private void LoadTourForEdit(TourDto tour)
+    {
+        _editingTourId = tour.Id; _title = tour.Title;
+        _description = tour.Description; _estimatedPrice = tour.EstimatedPrice;
+        _routeItems = tour.Pois.OrderBy(p => p.OrderIndex).Select(p =>
+        {
+            var poi = _allPois.FirstOrDefault(a => a.Id == p.PoiId);
+            return new TourRouteItem
+            {
+                PoiId = p.PoiId, Name = p.PoiName,
+                Latitude = p.Latitude, Longitude = p.Longitude,
+                PopularityScore = poi?.PopularityScore ?? 0, OrderIndex = p.OrderIndex
+            };
+        }).ToList();
+        ClearMessages();
+    }
+
+    private async Task SaveTourAsync()
+    {
+        ClearMessages();
+        if (string.IsNullOrWhiteSpace(_title)) { _errorMsg = "Vui lòng nhập tên tour."; return; }
+        if (_routeItems.Count == 0)            { _errorMsg = "Tour phải có ít nhất 1 điểm dừng."; return; }
+        _saving = true;
+        var pois = _routeItems.Select(r => new TourPoiItemRequest { PoiId = r.PoiId, OrderIndex = r.OrderIndex }).ToList();
+        bool ok;
+        if (_editingTourId.HasValue)
+            ok = await TourService.UpdateTourAsync(_editingTourId.Value, new TourUpdateRequest
+                { Title = _title, Description = _description, EstimatedPrice = _estimatedPrice, Pois = pois });
+        else
+            ok = await TourService.CreateTourAsync(new TourCreateRequest
+                { Title = _title, Description = _description, EstimatedPrice = _estimatedPrice, Pois = pois });
+        _saving = false;
+        if (ok)
+        {
+            _successMsg = _editingTourId.HasValue ? "Cập nhật tour thành công!" : "Tạo tour thành công!";
+            ClearForm(); _existingTours = await TourService.GetToursAsync();
+        }
+        else { _errorMsg = "Có lỗi xảy ra. Vui lòng thử lại."; }
+    }
+
+    private async Task DeleteTourAsync(int id)
+    {
+        if (await TourService.DeleteTourAsync(id))
+        { _existingTours = _existingTours.Where(t => t.Id != id).ToList(); _successMsg = "Đã xóa tour."; }
+        else { _errorMsg = "Xóa tour thất bại."; }
+    }
+
+    // Need sync wrappers so Razor event handlers compile (Blazor requires void/Task)
+    private void RemoveFromRoute(int idx) => _ = RemoveFromRouteAsync(idx);
+    private void MoveUp(int idx)          => _ = MoveUpAsync(idx);
+    private void MoveDown(int idx)        => _ = MoveDownAsync(idx);
+    private void OnDrop(int idx)          => _ = OnDropAsync(idx);
+}
+
+<style>
+/* ══════════════════════════════════
+   LIGHT THEME – Tour Builder
+══════════════════════════════════ */
+.tb {
+    padding: 2rem;
+    max-width: 1500px;
+    margin: 0 auto;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    color: #1e293b;
+    background: #f8fafc;
+}
+
+/* ── Header ── */
+.tb-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; }
+.tb-title {
+    font-size: 2rem; font-weight: 800; margin: 0;
+    background: linear-gradient(120deg,#2563eb,#7c3aed);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.tb-subtitle { color:#64748b; margin:.2rem 0 0; font-size:.9rem; }
+.tb-header-right { display:flex; gap:.6rem; align-items:center; }
+.tb-alert {
+    padding:.4rem 1rem; border-radius:999px; font-size:.84rem; font-weight:600;
+    animation: tb-fade .3s ease;
+}
+@@keyframes tb-fade { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.tb-alert-ok  { background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; }
+.tb-alert-err { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }
+
+/* ── Stats ── */
+.tb-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.25rem; }
+.tb-stat {
+    background:#fff; border:1px solid #e2e8f0; border-radius:14px;
+    padding:1rem 1.25rem; display:flex; align-items:center; gap:.9rem;
+    box-shadow:0 1px 4px rgba(0,0,0,.06); transition:box-shadow .2s;
+}
+.tb-stat:hover { box-shadow:0 4px 14px rgba(37,99,235,.1); }
+.tb-stat-ico { font-size:1.7rem; }
+.tb-stat-val { font-size:1.3rem; font-weight:800; color:#1e293b; margin:0; }
+.tb-stat-val-sm { font-size:.95rem; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-stat-lbl { font-size:.73rem; color:#94a3b8; margin:0; }
+
+
+
+/* ── Form card ── */
+.tb-card {
+    background:#fff; border:1px solid #e2e8f0;
+    border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,.05);
+}
+.tb-form-card { padding:1.4rem; margin-bottom:1.25rem; }
+.tb-form-h { font-size:1rem; font-weight:700; color:#1e293b; margin:0 0 1rem; }
+.tb-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.tb-span2 { grid-column:span 2; }
+.tb-fg { display:flex; flex-direction:column; gap:.3rem; }
+.tb-fg label { font-size:.82rem; font-weight:600; color:#475569; }
+.tb-inp {
+    background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+    padding:.55rem .85rem; color:#1e293b; font-size:.88rem;
+    transition:border-color .2s,box-shadow .2s; width:100%; box-sizing:border-box;
+}
+.tb-inp:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); background:#fff; }
+.tb-ta { min-height:72px; resize:vertical; }
+.tb-sel {
+    background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+    padding:.4rem .7rem; color:#1e293b; font-size:.82rem;
+}
+.tb-btn-cancel {
+    margin-top:.7rem; background:transparent; border:1px solid #fca5a5;
+    color:#dc2626; border-radius:7px; padding:.38rem .85rem;
+    font-size:.82rem; cursor:pointer; transition:background .15s;
+}
+.tb-btn-cancel:hover { background:#fee2e2; }
+
+/* ── 3-column Builder ── */
+.tb-builder { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1.25rem; margin-bottom:2rem; align-items:start; }
+
+.tb-panel { background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,.05); display:flex; flex-direction:column; overflow:hidden; }
+.tb-panel-hd {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.85rem 1.1rem; border-bottom:1px solid #f1f5f9;
+    background:#f8fafc; gap:.4rem; flex-wrap:wrap;
+}
+.tb-panel-hd h2 { margin:0; font-size:.95rem; font-weight:700; color:#1e293b; }
+.tb-panel-hd-r { display:flex; align-items:center; gap:.4rem; }
+.tb-badge { background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; padding:.2rem .55rem; border-radius:999px; font-size:.75rem; font-weight:700; }
+
+.tb-btn-smart {
+    background:linear-gradient(135deg,#2563eb,#7c3aed); color:#fff;
+    border:none; border-radius:8px; padding:.35rem .7rem;
+    font-size:.76rem; font-weight:700; cursor:pointer; transition:filter .15s;
+}
+.tb-btn-smart:hover:not(:disabled) { filter:brightness(1.1); }
+.tb-btn-smart:disabled { opacity:.6; cursor:not-allowed; }
+.tb-pulsing { animation:tbpulse 1s infinite; }
+@@keyframes tbpulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+/* ── POI Pool ── */
+.tb-search { padding:.6rem .9rem .4rem; border-bottom:1px solid #f1f5f9; }
+.tb-pool { flex:1; overflow-y:auto; padding:.5rem .9rem .9rem; display:flex; flex-direction:column; gap:.5rem; max-height:500px; }
+.tb-poi {
+    display:flex; align-items:center; gap:.7rem;
+    border:1px solid #e2e8f0; border-radius:10px;
+    padding:.55rem .8rem; transition:border-color .2s,box-shadow .2s; background:#fff;
+}
+.tb-poi:hover { border-color:#2563eb; box-shadow:0 2px 8px rgba(37,99,235,.08); }
+.tb-poi-done { opacity:.4; }
+.tb-fire { position:absolute; top:-4px; right:-4px; font-size:.65rem; background:#fff; border-radius:50%; padding:1px; }
+.tb-poi-info { flex:1; min-width:0; }
+.tb-poi-name { margin:0; font-size:.87rem; font-weight:600; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-poi-meta { margin:.1rem 0 0; font-size:.72rem; color:#94a3b8; }
+.tb-empty { text-align:center; color:#94a3b8; padding:2rem 0; font-size:.88rem; }
+.tb-btn-add {
+    background:linear-gradient(135deg,#2563eb,#7c3aed); color:#fff;
+    border:none; border-radius:7px; padding:.32rem .65rem;
+    font-size:.78rem; font-weight:700; cursor:pointer; white-space:nowrap;
+    transition:filter .15s; flex-shrink:0;
+}
+.tb-btn-add:hover { filter:brightness(1.1); }
+.tb-btn-done { background:#e2e8f0; color:#94a3b8; border:none; border-radius:7px; padding:.32rem .65rem; font-size:.78rem; font-weight:600; flex-shrink:0; cursor:default; }
+
+/* ── Route list ── */
+.tb-route { flex:1; overflow-y:auto; padding:.6rem .9rem; display:flex; flex-direction:column; gap:.45rem; max-height:440px; }
+.tb-stop {
+    display:flex; align-items:center; gap:.55rem;
+    border:1px solid #e2e8f0; border-radius:10px;
+    padding:.55rem .75rem; background:#fff; cursor:grab;
+    transition:border-color .2s,box-shadow .2s; user-select:none;
+}
+.tb-stop:hover { border-color:#7c3aed; box-shadow:0 2px 8px rgba(124,58,237,.1); }
+.tb-dragging { opacity:.45; box-shadow:0 8px 20px rgba(0,0,0,.12); }
+.tb-stop-num {
+    width:26px; height:26px; border-radius:50%; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.76rem; font-weight:800; flex-shrink:0;
+}
+.tb-drag-h { color:#cbd5e1; font-size:1rem; cursor:grab; flex-shrink:0; }
+.tb-stop-info { flex:1; min-width:0; }
+.tb-stop-name { margin:0; font-size:.87rem; font-weight:600; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tb-stop-score { margin:.08rem 0 0; font-size:.71rem; color:#f59e0b; }
+.tb-stop-arrows { display:flex; flex-direction:column; gap:2px; }
+.tb-arr {
+    background:#f8fafc; border:1px solid #e2e8f0; color:#64748b;
+    border-radius:4px; width:21px; height:19px; font-size:.68rem;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+}
+.tb-arr:hover:not(:disabled) { background:#eff6ff; color:#2563eb; border-color:#bfdbfe; }
+.tb-arr:disabled { opacity:.3; cursor:default; }
+.tb-rm {
+    background:transparent; border:none; color:#ef4444; cursor:pointer;
+    font-size:.82rem; padding:.15rem .25rem; border-radius:4px; transition:background .15s;
+}
+.tb-rm:hover { background:#fee2e2; }
+.tb-empty-route {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; padding:2.5rem 1rem; color:#94a3b8; text-align:center; gap:.4rem;
+}
+.tb-empty-route span { font-size:2.5rem; }
+.tb-save-area { padding:.9rem; border-top:1px solid #f1f5f9; }
+.tb-btn-save {
+    width:100%; padding:.7rem; background:linear-gradient(135deg,#2563eb,#7c3aed);
+    color:#fff; border:none; border-radius:10px; font-size:.93rem; font-weight:700;
+    cursor:pointer; transition:filter .2s,opacity .2s;
+}
+.tb-btn-save:hover:not(:disabled) { filter:brightness(1.08); }
+.tb-btn-save:disabled { opacity:.6; cursor:not-allowed; }
+
+/* ── Map panel ── */
+.tb-map-panel { min-height:400px; }
+.tb-map-empty {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:.5rem; padding:3rem 1rem;
+    color:#94a3b8; text-align:center;
+}
+.tb-map-empty span { font-size:2.5rem; }
+.tb-map-wrap { flex:1; }
+.tb-leaflet { height:300px; width:100%; z-index:1; }
+.tb-map-legend {
+    padding:.75rem 1rem; border-top:1px solid #f1f5f9;
+    display:flex; flex-direction:column; gap:.3rem; max-height:160px; overflow-y:auto;
+}
+.tb-legend-row { display:flex; align-items:center; gap:.5rem; }
+.tb-legend-dot {
+    width:22px; height:22px; border-radius:50%; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.7rem; font-weight:800; flex-shrink:0;
+}
+.tb-legend-name { font-size:.8rem; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ── Existing tours ── */
+.tb-existing { margin-top:.5rem; }
+.tb-existing-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; }
+.tb-tour-card {
+    background:#fff; border:1px solid #e2e8f0; border-radius:14px;
+    padding:1.2rem; box-shadow:0 1px 4px rgba(0,0,0,.05);
+    transition:box-shadow .2s,border-color .2s; position:relative; overflow:hidden;
+}
+.tb-tour-card:hover { box-shadow:0 4px 16px rgba(37,99,235,.1); border-color:#bfdbfe; }
+.tb-tour-active { border-color:#bbf7d0 !important; }
+.tb-tour-active:hover { border-color:#4ade80 !important; box-shadow:0 4px 16px rgba(74,222,128,.12) !important; }
+.tb-usage-tag {
+    position:absolute; top:.75rem; right:.75rem;
+    background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;
+    border-radius:999px; padding:.18rem .55rem;
+    font-size:.73rem; font-weight:700;
+}
+.tb-tour-hd { display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; padding-right:5rem; }
+.tb-tour-hd h3 { margin:0; font-size:.97rem; font-weight:700; color:#1e293b; }
+.tb-price { color:#16a34a; font-size:.84rem; font-weight:700; white-space:nowrap; }
+.tb-tour-desc { font-size:.8rem; color:#64748b; margin:.4rem 0; }
+.tb-usage-row { display:flex; align-items:center; gap:.6rem; margin:.55rem 0 .4rem; }
+.tb-bar-bg { flex:1; height:5px; background:#f1f5f9; border-radius:999px; overflow:hidden; }
+.tb-bar { height:100%; background:linear-gradient(90deg,#2563eb,#4ade80); border-radius:999px; transition:width .5s; }
+.tb-bar-lbl { font-size:.7rem; color:#94a3b8; white-space:nowrap; }
+.tb-stops { display:flex; flex-wrap:wrap; gap:.35rem; margin:.4rem 0; }
+.tb-stop-tag {
+    background:#f8fafc; border:1px solid #e2e8f0;
+    padding:.22rem .5rem; border-radius:6px; font-size:.73rem; color:#64748b;
+}
+.tb-tour-ft { display:flex; align-items:center; gap:.4rem; margin-top:.65rem; }
+.tb-tour-date { flex:1; font-size:.75rem; color:#94a3b8; }
+.tb-btn-edit {
+    background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;
+    border-radius:7px; padding:.3rem .65rem; font-size:.78rem; font-weight:600;
+    cursor:pointer; transition:background .15s;
+}
+.tb-btn-edit:hover { background:#dbeafe; }
+.tb-btn-del {
+    background:#fee2e2; color:#dc2626; border:1px solid #fecaca;
+    border-radius:7px; padding:.3rem .65rem; font-size:.78rem; font-weight:600;
+    cursor:pointer; transition:background .15s;
+}
+.tb-btn-del:hover { background:#fecaca; }
+
+/* ══ RESPONSIVE ══ */
+@@media(max-width:1200px) {
+    .tb-builder { grid-template-columns:1fr 1fr; }
+    .tb-map-panel { grid-column:span 2; }
+}
+@@media(max-width:900px) {
+    .tb-stats { grid-template-columns:1fr 1fr; }
+    .tb-builder { grid-template-columns:1fr; }
+    .tb-map-panel { grid-column:span 1; }
+    .tb-form-grid { grid-template-columns:1fr; }
+    .tb-span2 { grid-column:span 1; }
+}
+@@media(max-width:560px) {
+    .tb-stats { grid-template-columns:1fr; }
+}
+</style>

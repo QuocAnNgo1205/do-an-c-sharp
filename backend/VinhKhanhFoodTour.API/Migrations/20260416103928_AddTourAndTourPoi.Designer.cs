@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using VinhKhanhFoodTour.Data;
@@ -12,9 +13,11 @@ using VinhKhanhFoodTour.Data;
 namespace VinhKhanhFoodTour.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260416103928_AddTourAndTourPoi")]
+    partial class AddTourAndTourPoi
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -244,33 +247,6 @@ namespace VinhKhanhFoodTour.API.Migrations
                     b.ToTable("TourPois");
                 });
 
-            modelBuilder.Entity("VinhKhanhFoodTour.Models.TourUsageLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("DeviceId")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<DateTime>("Timestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<int>("TourId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TourId");
-
-                    b.ToTable("TourUsageLogs");
-                });
-
             modelBuilder.Entity("VinhKhanhFoodTour.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -373,17 +349,6 @@ namespace VinhKhanhFoodTour.API.Migrations
                     b.Navigation("Tour");
                 });
 
-            modelBuilder.Entity("VinhKhanhFoodTour.Models.TourUsageLog", b =>
-                {
-                    b.HasOne("VinhKhanhFoodTour.Models.Tour", "Tour")
-                        .WithMany("UsageLogs")
-                        .HasForeignKey("TourId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Tour");
-                });
-
             modelBuilder.Entity("VinhKhanhFoodTour.Models.User", b =>
                 {
                     b.HasOne("VinhKhanhFoodTour.Models.Role", "Role")
@@ -412,8 +377,6 @@ namespace VinhKhanhFoodTour.API.Migrations
             modelBuilder.Entity("VinhKhanhFoodTour.Models.Tour", b =>
                 {
                     b.Navigation("TourPois");
-
-                    b.Navigation("UsageLogs");
                 });
 
             modelBuilder.Entity("VinhKhanhFoodTour.Models.User", b =>

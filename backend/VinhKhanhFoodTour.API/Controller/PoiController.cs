@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using VinhKhanhFoodTour.Data;
 using VinhKhanhFoodTour.DTOs;
 using VinhKhanhFoodTour.API.Services;
 using VinhKhanhFoodTour.Models;
@@ -16,13 +18,16 @@ namespace VinhKhanhFoodTour.API.Controllers
         private readonly IPoiService _poiService;
         private readonly IMediaService _mediaService;
         private readonly ISyncOrchestrator _syncOrchestrator;
+        private readonly AppDbContext _db;
 
-        public PoiController(IPoiService poiService, IMediaService mediaService, ISyncOrchestrator syncOrchestrator)
+        public PoiController(IPoiService poiService, IMediaService mediaService, ISyncOrchestrator syncOrchestrator, AppDbContext db)
         {
             _poiService = poiService;
             _mediaService = mediaService;
             _syncOrchestrator = syncOrchestrator;
+            _db = db;
         }
+
 
         // ======================================================================
         // CÁC HÀM TÔI THÊM VÀO ĐỂ SỬA LỖI CHO BẠN
@@ -503,4 +508,174 @@ namespace VinhKhanhFoodTour.API.Controllers
             }
         }
     }
+
+    // ── Unused placeholder kept for line-count compatibility ──
+
+    // Extension: analytics endpoint added below the class is intentional;
+    // the real implementation is appended correctly via the partial below.
 }
+
+// ── Analytics DTO (file-scoped for simplicity) ──────────────────────────────
+namespace VinhKhanhFoodTour.API.Controllers
+{
+    public static class PoiAnalyticsExtensions { } // intentionally empty
+
+    [Route("api/v1/Poi")]
+    [ApiController]
+    public class PoiAnalyticsController : ControllerBase
+    {
+        private readonly VinhKhanhFoodTour.Data.AppDbContext _db;
+        public PoiAnalyticsController(VinhKhanhFoodTour.Data.AppDbContext db) => _db = db;
+
+        // GET /api/v1/Poi/analytics
+        [HttpGet("analytics")]
+        [Authorize(Roles = "Admin,Owner")]
+        public async Task<IActionResult> GetPoiAnalytics()
+        {
+            try
+            {
+                var isAdmin = User.IsInRole("Admin");
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                int? ownerId = null;
+                if (!isAdmin && int.TryParse(userIdStr, out var uId))
+                {
+                    ownerId = uId;
+                }
+
+                // Filter Narration Logs
+                var narrationQuery = _db.NarrationLogs.AsQueryable();
+                if (ownerId.HasValue) narrationQuery = narrationQuery.Where(n => n.Poi!.OwnerId == ownerId.Value);
+
+                var narrationCounts = await narrationQuery
+                    .GroupBy(n => new { n.PoiId, n.Poi!.Name })
+                    .Select(g => new { g.Key.PoiId, g.Key.Name, Count = g.Count() })
+                    .ToListAsync();
+
+                // Filter QR Scan Logs
+                var qrQuery = _db.QrScanLogs.AsQueryable();
+                if (ownerId.HasValue) qrQuery = qrQuery.Where(q => q.Poi!.OwnerId == ownerId.Value);
+
+                var qrCounts = await qrQuery
+                    .GroupBy(q => q.PoiId)
+                    .Select(g => new { PoiId = g.Key, Count = g.Count() })
+                    .ToListAsync();
+
+                // Filter POIs
+                var poiQuery = _db.Pois.AsQueryable();
+                if (ownerId.HasValue) poiQuery = poiQuery.Where(p => p.OwnerId == ownerId.Value);
+
+                var allPois = await poiQuery
+                    .Select(p => new { p.Id, p.Name })
+                    .ToListAsync();
+
+                var poiStats = allPois.Select(p => new
+                {
+                    poiId       = p.Id,
+                    poiName     = p.Name,
+                    listenCount = narrationCounts.FirstOrDefault(n => n.PoiId == p.Id)?.Count ?? 0,
+                    qrScanCount = qrCounts.FirstOrDefault(q => q.PoiId == p.Id)?.Count ?? 0
+                })
+                .OrderByDescending(x => x.listenCount + x.qrScanCount)
+                .ToList();
+
+                var cutoff   = DateTime.UtcNow.AddMonths(-11);
+                
+                // Filter Monthly Trend
+                var trendQuery = _db.NarrationLogs.Where(n => n.Timestamp >= new DateTime(cutoff.Year, cutoff.Month, 1));
+                if (ownerId.HasValue) trendQuery = trendQuery.Where(n => n.Poi!.OwnerId == ownerId.Value);
+
+                var monthlyRaw = await trendQuery
+                    .GroupBy(n => new { n.Timestamp.Year, n.Timestamp.Month })
+                    .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+                    .ToListAsync();
+
+                var monthlyTrend = Enumerable.Range(0, 12)
+                    .Select(i =>
+                    {
+                        var d   = DateTime.UtcNow.AddMonths(-(11 - i));
+                        var cnt = monthlyRaw.FirstOrDefault(m => m.Year == d.Year && m.Month == d.Month)?.Count ?? 0;
+                        return new { label = d.ToString("MM/yyyy"), count = cnt };
+                    })
+                    .ToList();
+
+                return Ok(new { poiStats, monthlyTrend });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi lấy thống kê: " + ex.Message });
+            }
+        }
+
+        // GET /api/v1/Poi/owner/qr-manage
+        [HttpGet("owner/qr-manage")]
+        [Authorize(Roles = "Owner")]
+        public async Task<IActionResult> GetOwnerQrManagement()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out var ownerId))
+                {
+                    return Unauthorized(new { Message = "Không thể xác định người dùng." });
+                }
+
+                // Get owner's POIs with unique QR scan logic
+                var pois = await _db.Pois
+                    .Where(p => p.OwnerId == ownerId)
+                    .Select(p => new
+                    {
+                        poiId = p.Id,
+                        poiName = p.Name,
+                        // Count DISTINCT DeviceId from QrScanLogs for this POI
+                        uniqueScanCount = _db.QrScanLogs
+                            .Where(q => q.PoiId == p.Id && q.DeviceId != null)
+                            .Select(q => q.DeviceId)
+                            .Distinct()
+                            .Count(),
+                        // Total overall scans just for reference (optional, keeping it simple if needed)
+                        totalScanCount = _db.QrScanLogs.Count(q => q.PoiId == p.Id)
+                    })
+                    .OrderByDescending(x => x.uniqueScanCount)
+                    .ToListAsync();
+
+                return Ok(pois);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi lấy dữ liệu QR: " + ex.Message });
+            }
+        }
+
+        // GET /api/v1/Poi/admin/qr-manage
+        [HttpGet("admin/qr-manage")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAdminQrManagement()
+        {
+            try
+            {
+                // Get all POIs with unique QR scan logic
+                var pois = await _db.Pois
+                    .Select(p => new
+                    {
+                        poiId = p.Id,
+                        poiName = p.Name,
+                        uniqueScanCount = _db.QrScanLogs
+                            .Where(q => q.PoiId == p.Id && q.DeviceId != null)
+                            .Select(q => q.DeviceId)
+                            .Distinct()
+                            .Count(),
+                        totalScanCount = _db.QrScanLogs.Count(q => q.PoiId == p.Id)
+                    })
+                    .OrderByDescending(x => x.uniqueScanCount)
+                    .ToListAsync();
+
+                return Ok(pois);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Lỗi khi lấy dữ liệu QR hệ thống: " + ex.Message });
+            }
+        }
+    }
+}

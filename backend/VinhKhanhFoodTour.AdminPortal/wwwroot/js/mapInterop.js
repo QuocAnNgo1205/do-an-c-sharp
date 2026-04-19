@@ -193,3 +193,104 @@ window.leafletMapInterop = {
         }
     }
 };
+
+/* ─────────────────────────────────────────────
+   Tour Route Mini-Map  (isolated map instance)
+   ───────────────────────────────────────────── */
+window.tourRouteMap = {
+    _map: null,
+    _layers: [],
+
+    /**
+     * Draw (or redraw) the tour route mini-map.
+     * @param {string} elementId  - id of the <div> container
+     * @param {Array}  waypoints  - [{orderIndex, name, latitude, longitude}]
+     */
+    render: function (elementId, waypoints) {
+        // Destroy existing instance tied to this element
+        if (this._map) {
+            this._map.remove();
+            this._map = null;
+            this._layers = [];
+        }
+
+        if (!waypoints || waypoints.length === 0) return;
+
+        // Light tile layer (Carto Positron)
+        this._map = L.map(elementId, { zoomControl: true, scrollWheelZoom: false })
+            .setView([waypoints[0].latitude, waypoints[0].longitude], 15);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OSM &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(this._map);
+
+        var latLngs = [];
+        var colors = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
+
+        waypoints.forEach(function (wp, idx) {
+            var ll = [wp.latitude, wp.longitude];
+            latLngs.push(ll);
+
+            // Numbered circle marker
+            var color = colors[idx % colors.length];
+            var icon = L.divIcon({
+                className: '',
+                html: `<div style="
+                    width:28px;height:28px;border-radius:50%;
+                    background:${color};color:#fff;
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:12px;font-weight:700;
+                    box-shadow:0 2px 6px rgba(0,0,0,.35);
+                    border:2px solid #fff;
+                ">${wp.orderIndex}</div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -16]
+            });
+
+            var m = L.marker(ll, { icon: icon }).addTo(this._map);
+            m.bindPopup(`<b>${wp.orderIndex}. ${wp.name}</b>`);
+            this._layers.push(m);
+        }.bind(this));
+
+        // Draw route polyline with arrows
+        if (latLngs.length > 1) {
+            var poly = L.polyline(latLngs, {
+                color: '#3b82f6',
+                weight: 3,
+                opacity: 0.85,
+                dashArray: '8 6'
+            }).addTo(this._map);
+            this._layers.push(poly);
+
+            // Arrowheads using circleMarkers along the line
+            for (var i = 0; i < latLngs.length - 1; i++) {
+                var midLat = (latLngs[i][0] + latLngs[i+1][0]) / 2;
+                var midLng = (latLngs[i][1] + latLngs[i+1][1]) / 2;
+                var dot = L.circleMarker([midLat, midLng], {
+                    radius: 4, color: '#3b82f6', fillColor: '#3b82f6',
+                    fillOpacity: 1, weight: 0
+                }).addTo(this._map);
+                this._layers.push(dot);
+            }
+
+            this._map.fitBounds(poly.getBounds(), { padding: [30, 30] });
+        } else {
+            this._map.setView(latLngs[0], 16);
+        }
+
+        // Force size recalculation after DOM settle
+        setTimeout(() => { if (this._map) this._map.invalidateSize(); }, 150);
+    },
+
+    destroy: function () {
+        if (this._map) {
+            this._map.remove();
+            this._map = null;
+            this._layers = [];
+        }
+    }
+};
+

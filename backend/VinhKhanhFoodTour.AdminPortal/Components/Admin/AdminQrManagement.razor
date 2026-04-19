@@ -1,0 +1,126 @@
+@page "/admin/qr-management"
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@inject IPoiService PoiService
+@rendermode InteractiveServer
+
+<PageTitle>Quản lý mã QR hệ thống – Vinh Khánh Food Tour</PageTitle>
+
+<div class="max-w-6xl mx-auto p-4 md:p-8">
+    <div class="mb-8">
+        <h1 class="text-3xl font-extrabold text-slate-900 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+            🌐 Hệ thống QR
+        </h1>
+        <p class="text-slate-500 mt-2">Quản lý và theo dõi lượt quét QR của toàn bộ quán ăn trên hệ thống.</p>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="flex flex-col items-center justify-center p-12 text-slate-500">
+            <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+            <p>Đang tải dữ liệu hệ thống...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-center gap-3">
+            <span class="text-xl">⚠️</span> @_error
+        </div>
+    }
+    else if (!_stats.Any())
+    {
+        <div class="text-center py-16 bg-white rounded-2xl shadow-sm border border-slate-100">
+            <div class="text-5xl mb-4 opacity-50">🏢</div>
+            <p class="text-slate-500">Hệ thống chưa có quán ăn nào.</p>
+        </div>
+    }
+    else
+    {
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="uppercase tracking-wider border-b-2 border-slate-200 bg-slate-50 text-slate-500 font-semibold">
+                        <tr>
+                            <th class="px-6 py-4">Tên quán ăn</th>
+                            <th class="px-6 py-4 text-right">Lượt quét (Thiết bị)</th>
+                            <th class="px-6 py-4 text-center">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-slate-700">
+                        @foreach (var stat in _stats)
+                        {
+                            <tr class="hover:bg-slate-50/80 transition-colors">
+                                <td class="px-6 py-4 font-semibold text-slate-900">
+                                    @stat.PoiName
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="inline-flex items-center justify-end gap-2 text-blue-600 font-bold bg-blue-50 px-3 py-1 rounded-full">
+                                        <span>📱</span>
+                                        @stat.UniqueScanCount
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <button @onclick="() => OpenQrModal(stat.PoiId, stat.PoiName)"
+                                            class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm font-medium">
+                                        <span>🖨️</span> Xem / Tải QR
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<QrCodeModal IsOpen="_isQrModalOpen"
+             PoiId="_selectedPoiId"
+             PoiName="@_selectedPoiName"
+             OnClose="CloseQrModal" />
+
+@code {
+    private bool _loading = true;
+    private string _error = string.Empty;
+    private List<QrManageStatDto> _stats = new();
+
+    private bool _isQrModalOpen = false;
+    private int _selectedPoiId = 0;
+    private string _selectedPoiName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            _loading = true;
+            _error = string.Empty;
+            _stats = await PoiService.GetAdminQrStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenQrModal(int poiId, string poiName)
+    {
+        _selectedPoiId = poiId;
+        _selectedPoiName = poiName;
+        _isQrModalOpen = true;
+    }
+
+    private void CloseQrModal()
+    {
+        _isQrModalOpen = false;
+        _selectedPoiId = 0;
+        _selectedPoiName = string.Empty;
+    }
+}

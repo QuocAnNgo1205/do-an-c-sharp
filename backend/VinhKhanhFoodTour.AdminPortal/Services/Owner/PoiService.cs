@@ -210,4 +210,32 @@ public class PoiService : IPoiService
             return null;
         }
     }
+
+    public async Task<List<QrManageStatDto>> GetOwnerQrStatsAsync()
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<QrManageStatDto>>($"api/v1/Poi/owner/qr-manage");
+            return result ?? new List<QrManageStatDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching QR stats: {ex.Message}");
+            return new List<QrManageStatDto>();
+        }
+    }
+
+    public async Task<List<QrManageStatDto>> GetAdminQrStatsAsync()
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<QrManageStatDto>>($"api/v1/Poi/admin/qr-manage");
+            return result ?? new List<QrManageStatDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching system QR stats: {ex.Message}");
+            return new List<QrManageStatDto>();
+        }
+    }
 }

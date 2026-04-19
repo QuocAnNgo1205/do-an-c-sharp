@@ -45,6 +45,7 @@ builder.Services.AddScoped<AuthService>();
 
 // 5. Configure Business Services
 builder.Services.AddScoped<IPoiService, PoiService>();
+builder.Services.AddScoped<ITourService, TourService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ITranslationService, TranslationService>();
 

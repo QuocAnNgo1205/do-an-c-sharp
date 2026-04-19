@@ -49,5 +49,8 @@ namespace VinhKhanhFoodTour.Models
 
         // 1 Quán có nhiều lượt nghe lịch sử
         public virtual ICollection<NarrationLog> NarrationLogs { get; set; } = new List<NarrationLog>();
+
+        // Tours that include this Poi
+        public virtual ICollection<TourPoi> TourPois { get; set; } = new List<TourPoi>();
     }
 }

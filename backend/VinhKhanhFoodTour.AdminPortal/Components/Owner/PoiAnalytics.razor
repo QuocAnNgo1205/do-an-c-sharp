@@ -1,0 +1,299 @@
+@page "/poi-analytics"
+@using VinhKhanhFoodTour.AdminPortal.Services.Owner
+@using VinhKhanhFoodTour.AdminPortal.Services.Http
+@inject IPoiService PoiService
+@inject ApiClient ApiClient
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<PageTitle>Thống kê POI – Vinh Khánh Food Tour</PageTitle>
+
+<div class="pa">
+
+    <!-- ── HEADER ── -->
+    <div class="pa-header">
+        <div>
+            <h1 class="pa-title">📊 Thống kê Địa Điểm</h1>
+            <p class="pa-sub">Lượt nghe thuyết minh &amp; quét QR theo từng quán ăn</p>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="pa-loading">
+            <div class="pa-spinner"></div>
+            <p>Đang tải dữ liệu thống kê...</p>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="pa-error">⚠️ @_error</div>
+    }
+    else
+    {
+        <!-- ── SUMMARY CARDS ── -->
+        <div class="pa-cards">
+            <div class="pa-card">
+                <span class="pa-card-ico">📍</span>
+                <div>
+                    <p class="pa-card-val">@_stats.Count</p>
+                    <p class="pa-card-lbl">Tổng địa điểm</p>
+                </div>
+            </div>
+            <div class="pa-card">
+                <span class="pa-card-ico">📻</span>
+                <div>
+                    <p class="pa-card-val">@_stats.Sum(s => s.ListenCount)</p>
+                    <p class="pa-card-lbl">Tổng lượt nghe</p>
+                </div>
+            </div>
+            <div class="pa-card">
+                <span class="pa-card-ico">📷</span>
+                <div>
+                    <p class="pa-card-val">@_stats.Sum(s => s.QrScanCount)</p>
+                    <p class="pa-card-lbl">Tổng lượt quét QR</p>
+                </div>
+            </div>
+            <div class="pa-card">
+                <span class="pa-card-ico">🏆</span>
+                <div>
+                    <p class="pa-card-val pa-card-val-sm">@(_stats.FirstOrDefault()?.PoiName ?? "—")</p>
+                    <p class="pa-card-lbl">Nổi bật nhất</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── MONTHLY CHART ── -->
+        <div class="pa-chart-card">
+            <h2 class="pa-section-h">📈 Lượt nghe theo tháng (12 tháng gần nhất)</h2>
+            <div class="pa-chart-wrap">
+                <canvas id="poi-monthly-chart" height="90"></canvas>
+            </div>
+        </div>
+
+        <!-- ── POI TABLE ── -->
+        <div class="pa-table-card">
+            <div class="pa-table-hd">
+                <h2 class="pa-section-h">📋 Danh sách địa điểm</h2>
+                <input class="pa-search" placeholder="🔍 Tìm quán..." @bind="_search" @bind:event="oninput" />
+            </div>
+            <div class="pa-table-wrap">
+                <table class="pa-table">
+                    <thead>
+                        <tr>
+                            <th class="rank">#</th>
+                            <th>Tên quán</th>
+                            <th class="num">📻 Nghe</th>
+                            <th class="num">📷 QR</th>
+                            <th class="num">⭐ Tổng</th>
+                            <th class="bar-col">Tỉ lệ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            var filtered = FilteredStats.ToList();
+                            var max = filtered.Count > 0 ? filtered.Max(s => s.ListenCount + s.QrScanCount) : 1;
+                        }
+                        @for (int i = 0; i < filtered.Count; i++)
+                        {
+                            var s = filtered[i];
+                            var total = s.ListenCount + s.QrScanCount;
+                            var pct = max > 0 ? (double)total / max * 100 : 0;
+                            var rank = i + 1;
+                            <tr class="@(rank <= 3 ? $"top{rank}" : "")">
+                                <td class="rank">
+                                    @if (rank == 1) { <span class="medal">🥇</span> }
+                                    else if (rank == 2) { <span class="medal">🥈</span> }
+                                    else if (rank == 3) { <span class="medal">🥉</span> }
+                                    else { <span class="rank-num">@rank</span> }
+                                </td>
+                                <td class="name-cell">@s.PoiName</td>
+                                <td class="num">@s.ListenCount</td>
+                                <td class="num">@s.QrScanCount</td>
+                                <td class="num total">@total</td>
+                                <td class="bar-col">
+                                    <div class="bar-bg">
+                                        <div class="bar-fill" style="width:@pct.ToString("0")%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (!filtered.Any())
+                        {
+                            <tr><td colspan="6" class="no-data">Không tìm thấy địa điểm phù hợp</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private string _search = string.Empty;
+
+    private List<PoiAnalyticsStat> _stats = new();
+    private List<MonthlyPoint>     _trend  = new();
+
+    private IEnumerable<PoiAnalyticsStat> FilteredStats =>
+        _stats.Where(s => string.IsNullOrEmpty(_search) ||
+                          s.PoiName.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await ApiClient.GetAsync<PoiAnalyticsResponse>("api/v1/Poi/analytics");
+            if (result is not null)
+            {
+                _stats = result.PoiStats;
+                _trend = result.MonthlyTrend;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_loading && _error is null && _trend.Count > 0)
+        {
+            await RenderChartAsync();
+        }
+    }
+
+    private async Task RenderChartAsync()
+    {
+        var labels = _trend.Select(t => t.Label).ToArray();
+        var data   = _trend.Select(t => t.Count).ToArray();
+        await JSRuntime.InvokeVoidAsync("poiAnalyticsChart.render", "poi-monthly-chart", labels, data);
+    }
+
+    // ── Local DTOs (matching the backend anonymous types) ──
+    private class PoiAnalyticsResponse
+    {
+        public List<PoiAnalyticsStat> PoiStats     { get; set; } = new();
+        public List<MonthlyPoint>     MonthlyTrend { get; set; } = new();
+    }
+    private class PoiAnalyticsStat
+    {
+        public int    PoiId       { get; set; }
+        public string PoiName     { get; set; } = string.Empty;
+        public int    ListenCount { get; set; }
+        public int    QrScanCount { get; set; }
+    }
+    private class MonthlyPoint
+    {
+        public string Label { get; set; } = string.Empty;
+        public int    Count { get; set; }
+    }
+}
+
+<style>
+/* ══ POI Analytics – Light Theme ══ */
+.pa {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    font-family: 'Inter','Segoe UI',sans-serif;
+    color: #1e293b;
+    background: #f8fafc;
+}
+
+.pa-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; }
+.pa-title {
+    font-size:1.9rem; font-weight:800; margin:0;
+    background:linear-gradient(120deg,#2563eb,#7c3aed);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.pa-sub { color:#64748b; margin:.2rem 0 0; font-size:.9rem; }
+
+.pa-loading { display:flex; flex-direction:column; align-items:center; gap:1rem; padding:4rem; color:#64748b; }
+.pa-spinner { width:44px;height:44px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:pa-spin .8s linear infinite; }
+@@keyframes pa-spin { to{transform:rotate(360deg)} }
+.pa-error { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; border-radius:10px; padding:1rem 1.25rem; margin-bottom:1rem; }
+
+/* ── Cards ── */
+.pa-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+.pa-card {
+    background:#fff; border:1px solid #e2e8f0; border-radius:14px;
+    padding:1rem 1.25rem; display:flex; align-items:center; gap:.9rem;
+    box-shadow:0 1px 4px rgba(0,0,0,.06); transition:box-shadow .2s;
+}
+.pa-card:hover { box-shadow:0 4px 14px rgba(37,99,235,.1); }
+.pa-card-ico { font-size:1.75rem; flex-shrink:0; }
+.pa-card-val { font-size:1.3rem; font-weight:800; color:#1e293b; margin:0; }
+.pa-card-val-sm { font-size:.95rem; max-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pa-card-lbl { font-size:.73rem; color:#94a3b8; margin:0; }
+
+/* ── Chart ── */
+.pa-chart-card {
+    background:#fff; border:1px solid #e2e8f0; border-radius:16px;
+    padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 1px 4px rgba(0,0,0,.05);
+}
+.pa-section-h { font-size:1rem; font-weight:700; color:#1e293b; margin:0 0 1rem; }
+.pa-chart-wrap { position:relative; }
+
+/* ── Table ── */
+.pa-table-card {
+    background:#fff; border:1px solid #e2e8f0; border-radius:16px;
+    padding:1.5rem; box-shadow:0 1px 4px rgba(0,0,0,.05);
+}
+.pa-table-hd { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; flex-wrap:wrap; }
+.pa-search {
+    background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+    padding:.5rem .85rem; color:#1e293b; font-size:.87rem;
+    transition:border-color .2s; min-width:220px;
+}
+.pa-search:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+.pa-table-wrap { overflow-x:auto; }
+.pa-table {
+    width:100%; border-collapse:collapse; font-size:.88rem;
+}
+.pa-table th {
+    background:#f8fafc; color:#475569; font-size:.75rem; font-weight:700;
+    padding:.6rem .9rem; border-bottom:2px solid #e2e8f0;
+    text-align:left; white-space:nowrap;
+}
+.pa-table td {
+    padding:.65rem .9rem; border-bottom:1px solid #f1f5f9;
+    vertical-align:middle; color:#1e293b;
+}
+.pa-table tr:last-child td { border-bottom:none; }
+.pa-table tr:hover td { background:#f8fafc; }
+.pa-table .rank { width:48px; text-align:center; }
+.pa-table .num { text-align:right; width:80px; font-variant-numeric:tabular-nums; }
+.pa-table .total { font-weight:700; color:#2563eb; }
+.pa-table .bar-col { width:160px; }
+.pa-table .name-cell { font-weight:600; }
+.medal { font-size:1.1rem; }
+.rank-num { font-size:.82rem; color:#94a3b8; font-weight:600; }
+
+/* Trophy rows */
+.pa-table tr.top1 td { background:#fffbeb; }
+.pa-table tr.top2 td { background:#f8fafc; }
+.pa-table tr.top3 td { background:#fff7ed; }
+
+/* Progress bar */
+.bar-bg { background:#f1f5f9; border-radius:999px; height:6px; overflow:hidden; }
+.bar-fill { height:100%; background:linear-gradient(90deg,#2563eb,#7c3aed); border-radius:999px; transition:width .5s; }
+
+.no-data { text-align:center; color:#94a3b8; padding:2rem 0; }
+
+/* ══ Responsive ══ */
+@@media(max-width:900px) {
+    .pa-cards { grid-template-columns:1fr 1fr; }
+}
+@@media(max-width:560px) {
+    .pa-cards { grid-template-columns:1fr; }
+    .pa-table .bar-col { display:none; }
+}
+</style>

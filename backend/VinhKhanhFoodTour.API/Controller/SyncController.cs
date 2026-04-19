@@ -216,7 +216,8 @@ namespace VinhKhanhFoodTour.API.Controllers
                     PoiId = p.Id,
                     PoiName = p.Name,
                     ListenCount = mode.ToLower() == "scan" 
-                        ? _context.QrScanLogs.Count(n => n.PoiId == p.Id)
+                        ? _context.QrScanLogs.Where(n => n.PoiId == p.Id && n.DeviceId != null)
+                            .Select(n => n.DeviceId).Distinct().Count()
                         : _context.NarrationLogs.Count(n => n.PoiId == p.Id)
                 })
                 .ToListAsync();

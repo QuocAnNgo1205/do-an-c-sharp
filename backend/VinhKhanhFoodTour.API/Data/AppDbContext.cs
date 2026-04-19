@@ -16,6 +16,9 @@ namespace VinhKhanhFoodTour.Data
         public DbSet<PoiTranslation> PoiTranslations { get; set; } = null!;
         public DbSet<NarrationLog> NarrationLogs { get; set; } = null!;
         public DbSet<QrScanLog> QrScanLogs { get; set; } = null!;
+        public DbSet<Tour> Tours { get; set; } = null!;
+        public DbSet<TourPoi> TourPois { get; set; } = null!;
+        public DbSet<TourUsageLog> TourUsageLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -109,6 +112,45 @@ namespace VinhKhanhFoodTour.Data
                 entity.Property(q => q.PoiId).IsRequired();
                 entity.Property(q => q.DeviceId).IsRequired().HasMaxLength(255);
                 entity.Property(q => q.Timestamp).HasDefaultValueSql("GETUTCDATE()");
+            });
+
+            // ============== Tour Configuration ==============
+            modelBuilder.Entity<Tour>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+                entity.Property(t => t.Title).IsRequired().HasMaxLength(255);
+                entity.Property(t => t.Description).IsRequired(false);
+                entity.Property(t => t.EstimatedPrice).HasColumnType("decimal(18,2)");
+                entity.Property(t => t.ThumbnailUrl).HasMaxLength(500).IsRequired(false);
+                entity.Property(t => t.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            });
+
+            // ============== TourPoi Configuration ==============
+            modelBuilder.Entity<TourPoi>(entity =>
+            {
+                entity.HasKey(tp => new { tp.TourId, tp.PoiId });
+                entity.Property(tp => tp.OrderIndex).IsRequired();
+                entity.HasOne(tp => tp.Tour)
+                    .WithMany(t => t.TourPois)
+                    .HasForeignKey(tp => tp.TourId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(tp => tp.Poi)
+                    .WithMany(p => p.TourPois)
+                    .HasForeignKey(tp => tp.PoiId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ============== TourUsageLog Configuration ==============
+            modelBuilder.Entity<TourUsageLog>(entity =>
+            {
+                entity.HasKey(ul => ul.Id);
+                entity.Property(ul => ul.TourId).IsRequired();
+                entity.Property(ul => ul.DeviceId).HasMaxLength(255).IsRequired(false);
+                entity.Property(ul => ul.Timestamp).HasDefaultValueSql("GETUTCDATE()");
+                entity.HasOne(ul => ul.Tour)
+                    .WithMany(t => t.UsageLogs)
+                    .HasForeignKey(ul => ul.TourId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

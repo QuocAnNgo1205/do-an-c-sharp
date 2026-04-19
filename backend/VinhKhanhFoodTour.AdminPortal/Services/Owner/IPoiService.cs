@@ -58,6 +58,16 @@ public interface IPoiService
     /// Get POI by ID with owner status (not filtered by Approved)
     /// </summary>
     Task<PoiDto?> GetOwnerPoiByIdAsync(int id);
+
+    /// <summary>
+    /// Get QR management statistics for the logged in owner
+    /// </summary>
+    Task<List<QrManageStatDto>> GetOwnerQrStatsAsync();
+
+    /// <summary>
+    /// Get QR management statistics for the whole system (Admin only)
+    /// </summary>
+    Task<List<QrManageStatDto>> GetAdminQrStatsAsync();
 }
 
 public class PoiDto
@@ -127,4 +137,12 @@ public class OverviewMapPinDto
     public int Status { get; set; }
     public int OwnerId { get; set; }
     public int ListenCount { get; set; }
+}
+
+public class QrManageStatDto
+{
+    public int PoiId { get; set; }
+    public string PoiName { get; set; } = string.Empty;
+    public int UniqueScanCount { get; set; }
+    public int TotalScanCount { get; set; }
 }
