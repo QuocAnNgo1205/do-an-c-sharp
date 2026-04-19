@@ -19,6 +19,7 @@ public partial class MapPage : ContentPage
     private readonly Dictionary<Pin, Poi> _poiLookup = new();
     private Poi? _selectedPoi;
     private bool _isCardVisible = false;
+    private Circle? _activeHighlightCircle; // ✨ Vòng tròn nổi bật POI đang phát âm thanh
 
     public string? Lat { get; set; }
     public string? Lon { get; set; }
@@ -39,6 +40,15 @@ public partial class MapPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // 🎧 Lắng nghe sự kiện phát âm thanh để làm nổi bật Map
+        _audioGuideService.PlaybackStateChanged += OnAudioPlaybackStateChanged;
+
+        // 🔄 Nếu đang phát sẵn (do người dùng bật từ trang chủ), gọi hiển thị vòng tròn luôn
+        if (_audioGuideService.IsPlaying && _audioGuideService.CurrentPlayingPoiId.HasValue)
+        {
+            OnAudioPlaybackStateChanged(this, (_audioGuideService.CurrentPlayingPoiId.Value, true));
+        }
 
         // Bước 1: Luôn nạp tất cả các quán ăn từ Database lên bản đồ trước
         await LoadAllPinsAsync();
@@ -69,6 +79,60 @@ public partial class MapPage : ContentPage
         catch { }
     }
 
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        // Xóa lắng nghe để tránh rò rỉ bộ nhớ (Memory Leak)
+        _audioGuideService.PlaybackStateChanged -= OnAudioPlaybackStateChanged;
+    }
+
+    private void OnAudioPlaybackStateChanged(object? sender, (int PoiId, bool IsPlaying) e)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (e.IsPlaying)
+            {
+                // Xóa vòng cũ nếu có
+                if (_activeHighlightCircle != null)
+                {
+                    foodMap.MapElements.Remove(_activeHighlightCircle);
+                    _activeHighlightCircle = null;
+                }
+
+                // Tìm POI đang phát
+                var targetPoi = _poiLookup.Values.FirstOrDefault(p => p.Id == e.PoiId);
+                if (targetPoi != null && targetPoi.Latitude != 0 && targetPoi.Longitude != 0)
+                {
+                    var location = new Location(targetPoi.Latitude, targetPoi.Longitude);
+                    
+                    // Vẽ vòng tròn bán kính 30m màu Cam nổi bật
+                    _activeHighlightCircle = new Circle
+                    {
+                        Center = location,
+                        Radius = Distance.FromMeters(30),
+                        StrokeColor = Colors.DarkOrange,
+                        StrokeWidth = 8,
+                        FillColor = Color.FromRgba(255, 140, 0, 80) // Cam trong suốt 30%
+                    };
+                    
+                    foodMap.MapElements.Add(_activeHighlightCircle);
+                    
+                    // Zoom camera nhẹ nhàng tới điểm đó
+                    foodMap.MoveToRegion(MapSpan.FromCenterAndRadius(location, Distance.FromKilometers(0.3)));
+                }
+            }
+            else
+            {
+                // Tắt âm thanh -> xóa highlight
+                if (_activeHighlightCircle != null)
+                {
+                    foodMap.MapElements.Remove(_activeHighlightCircle);
+                    _activeHighlightCircle = null;
+                }
+            }
+        });
+    }
+
     private async Task LoadAllPinsAsync()
     {
         try
@@ -88,8 +152,20 @@ public partial class MapPage : ContentPage
 
             foodMap.Pins.Clear();
             _poiLookup.Clear();
+            
+            // Xóa đường polyline cũ nếu có (bằng cách xóa toàn bộ các line, chỉ giữ lại circle highlight hiện tại nếu có)
+            var elementsToRemove = foodMap.MapElements.Where(e => e is Polyline).ToList();
+            foreach(var el in elementsToRemove)
+            {
+                foodMap.MapElements.Remove(el);
+            }
 
-            foreach (var poi in pois)
+            // 🛠 FIX ZIGZAG: Sắp xếp các điểm theo kinh độ (Tây sang Đông) để đường đi mượt mà không bị lộn xộn
+            var orderedPois = pois.Where(p => p.Latitude != 0 && p.Longitude != 0)
+                                  .OrderByDescending(p => p.Latitude) // Vĩnh Khánh đi hơi chéo, sắp xếp theo vĩ độ giảm dần là chuẩn
+                                  .ToList();
+
+            foreach (var poi in orderedPois)
             {
                 if (poi.Latitude != 0 && poi.Longitude != 0)
                 {

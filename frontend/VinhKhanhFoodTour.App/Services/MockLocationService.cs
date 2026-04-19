@@ -10,9 +10,10 @@ namespace VinhKhanhFoodTour.App.Services
         private bool _isTracking;
         private Timer? _timer;
         
-        // Bắt đầu đi bộ từ đầu đường Vĩnh Khánh
-        private double _currentLat = 10.760446;
-        private double _currentLon = 106.700140;
+        // BUG FIX: Bắt đầu cách Ốc Oanh (10.760193, 106.702081) khoảng 25m về phía Tây
+        // Di chuyển về hướng Đông để vào trong Geofence sau ~12 giây (4 bước × 3s)
+        private double _currentLat = 10.760193;
+        private double _currentLon = 106.701800; // ~25m về phía Tây của Ốc Oanh
 
         public bool IsTracking => _isTracking;
 
@@ -28,9 +29,9 @@ namespace VinhKhanhFoodTour.App.Services
         {
             if (!_isTracking) return;
 
-            // Di chuyển 1 chút về phía nam/đông nam (Dọc đường Vĩnh Khánh)
-            _currentLat -= 0.00010;
-            _currentLon += 0.00005;
+            // BUG FIX: Di chuyển về phía Đông để tiếp cận Ốc Oanh (lon ~ 106.702081)
+            // Mỗi 0.000020 độ kinh ≈ 2.2m, sau ~4 bước (12s) sẽ vào Geofence 30m
+            _currentLon += 0.000020;
 
             LocationUpdated?.Invoke(this, new LocationEventArgs
             {

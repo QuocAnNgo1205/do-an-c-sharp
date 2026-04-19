@@ -3,9 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:VinhKhanhFoodTour.App.PageModels"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:services="clr-namespace:VinhKhanhFoodTour.App.Services"
              x:Class="VinhKhanhFoodTour.App.Pages.ProfilePage"
              x:DataType="pageModels:ProfilePageModel"
-             Title="Hồ sơ">
+             Title="{services:Translate TabProfile}">
 
     <ContentPage.Resources>
         <toolkit:IsNotNullConverter x:Key="IsNotNullConverter" />
@@ -35,7 +36,7 @@
 
             <!-- PHẦN CHỌN QUỐC GIA & NGÔN NGỮ THUYẾT MINH -->
             <VerticalStackLayout Spacing="15">
-                <Label Text="🌍 QUỐC GIA &amp; NGÔN NGỮ" FontSize="16" FontAttributes="Bold" TextColor="#FFC107" />
+                <Label Text="{services:Translate LanguageTitle}" FontSize="16" FontAttributes="Bold" TextColor="#FFC107" />
                 
                 <Border StrokeShape="RoundRectangle 15" StrokeThickness="0" BackgroundColor="#1A1A1A" Padding="0">
                     <VerticalStackLayout Spacing="0">
@@ -94,7 +95,7 @@
                         </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Border>
-                <Label Text="💡 Hệ thống sẽ tự động phát thuyết minh bằng ngôn ngữ này khi bạn đến gần quán ăn." 
+                <Label Text="{services:Translate LanguageHint}" 
                        FontSize="11" TextColor="#888888" LineBreakMode="WordWrap" />
             </VerticalStackLayout>
 

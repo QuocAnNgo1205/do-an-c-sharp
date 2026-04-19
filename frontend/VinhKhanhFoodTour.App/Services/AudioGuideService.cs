@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading;
 using Plugin.Maui.Audio;
 using VinhKhanhFoodTour.App.Data;
 using VinhKhanhFoodTour.App.Models;
@@ -23,6 +24,9 @@ public class AudioGuideService
     private bool _isPlaying = false;
     private CancellationTokenSource? _playingCancellation;
 
+    // Mutex chống spam nút gẫy bộ nhớ
+    private readonly SemaphoreSlim _playLock = new SemaphoreSlim(1, 1);
+
     // Event phát tín hiệu khi âm thanh bắt đầu hoặc dừng (Cho UI cập nhật)
     public event EventHandler<(int PoiId, bool IsPlaying)>? PlaybackStateChanged;
     private int? _currentPlayingPoiId;
@@ -40,6 +44,7 @@ public class AudioGuideService
     }
 
     public bool IsPlaying => _isPlaying;
+    public int? CurrentPlayingPoiId => _currentPlayingPoiId;
 
     /// <summary>
     /// Phát âm thanh cho POI với logic Fallback 3 Lớp hoàn chỉnh
@@ -47,6 +52,9 @@ public class AudioGuideService
     public async Task PlayAudioAsync(Poi poi, Action<bool>? onStateChanged = null, bool showErrors = true)
     {
         if (poi == null) return;
+
+        // ĐỢI/KHOÁ tiến trình nếu đang có tác vụ Play khác xử lý (Chống Spam click nút)
+        await _playLock.WaitAsync();
 
         // Lấy ngôn ngữ đang chọn của App từ Preferences
         string targetLang = Preferences.Default.Get("PreferredLanguage", Constants.DEFAULT_LANGUAGE_CODE);
@@ -193,12 +201,18 @@ public class AudioGuideService
         }
         finally
         {
-            _isPlaying = false;
+            // BUG FIX: Chỉ reset _isPlaying nếu player MP3 KHÔNG còn đang chạy.
+            // Nếu player đang chạy (Layer 1 MP3), _isPlaying sẽ được set về false
+            // bởi sự kiện PlaybackEnded — KHÔNG reset sớm ở đây.
             if (_activePlayer == null || !_activePlayer.IsPlaying)
             {
+                _isPlaying = false;
                 onStateChanged?.Invoke(false);
                 PlaybackStateChanged?.Invoke(this, (poi.Id, false));
             }
+
+            // Giải phóng Mutex để lần Play tiếp theo được chạy
+            _playLock.Release();
         }
     }
 
