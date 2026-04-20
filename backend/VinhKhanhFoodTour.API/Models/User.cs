@@ -34,5 +34,8 @@ namespace VinhKhanhFoodTour.Models
 
         // 1 Owner có thể quản lý nhiều quán ốc
         public virtual ICollection<Poi> OwnedPois { get; set; } = new List<Poi>();
+
+        // 1 User có thể đăng nhập trên nhiều thiết bị
+        public virtual ICollection<UserDevice> UserDevices { get; set; } = new List<UserDevice>();
     }
 }

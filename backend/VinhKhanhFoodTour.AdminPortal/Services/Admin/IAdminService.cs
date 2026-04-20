@@ -1,4 +1,5 @@
 using VinhKhanhFoodTour.AdminPortal.Models.Auth;
+using VinhKhanhFoodTour.AdminPortal.Models.Admin;
 using System.ComponentModel.DataAnnotations;
 
 namespace VinhKhanhFoodTour.AdminPortal.Services.Admin;
@@ -53,6 +54,7 @@ public class UserStatsDto
     public int TotalTourists { get; set; }
     public int TotalOwners { get; set; }
     public int TotalUsers { get; set; }
+    public int ActiveTourists { get; set; }
 }
 
 /// <summary>
@@ -99,4 +101,24 @@ public interface IAdminService
     /// Get user stats (Admin only)
     /// </summary>
     Task<UserStatsDto?> GetUserStatsAsync();
+
+    /// <summary>
+    /// Get active devices for a user (Admin only)
+    /// </summary>
+    Task<List<UserDeviceDto>> GetActiveDevicesAsync(int userId);
+
+    /// <summary>
+    /// Revoke a device's access (Admin only)
+    /// </summary>
+    Task<UserActionResponseDto> RevokeDeviceAsync(int userId, string deviceId);
+
+    /// <summary>
+    /// Get all audio files in the system
+    /// </summary>
+    Task<List<AdminAudioDto>> GetAudioFilesAsync();
+
+    /// <summary>
+    /// Delete an audio file
+    /// </summary>
+    Task<UserActionResponseDto> DeleteAudioFileAsync(string fileName);
 }

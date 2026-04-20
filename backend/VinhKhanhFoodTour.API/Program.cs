@@ -23,19 +23,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 builder.Services.AddControllers();
-// Cấu hình CORS - Chỉ cho phép các Web được chỉ định gọi API
+// Cấu hình CORS - Cho phép gọi từ Web hoặc App Mobile
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("SecurityCorsPolicy", policy =>
     {
-        policy.WithOrigins(
-                "https://localhost:5001", // Thay bằng Port lúc chạy chạy Blazor Web của bạn
-                "http://localhost:5000",
-                "https://ten-mien-khi-deploy-cua-ban.com" // Sau này public lên mạng thì điền domain vào đây
-              )
+        policy.AllowAnyOrigin() // Cho phép tất cả các nguồn (cần thiết cho mobile test)
               .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials(); // Rất quan trọng nếu hệ thống dùng Token/Cookie
+              .AllowAnyMethod();
     });
 });
 builder.Services.AddScoped<ISyncService, SyncService>();
@@ -212,12 +207,21 @@ catch (Exception ex)
     Console.WriteLine($"[LỖI TẠO THƯ MỤC]: {ex.Message}");
 }
 
-app.UseStaticFiles(new StaticFileOptions
+// Cấu hình phục vụ file tĩnh (ảnh, âm thanh) từ thư mục wwwroot
+app.UseStaticFiles(); 
+// Fallback trong trường hợp cần chỉ định rõ thư mục nếu WebRootPath bị null
+if (string.IsNullOrEmpty(app.Environment.WebRootPath))
 {
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
-    RequestPath = ""
-});
+    var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+    if (Directory.Exists(wwwrootPath))
+    {
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(wwwrootPath),
+            RequestPath = ""
+        });
+    }
+}
 
 app.UseCors("SecurityCorsPolicy");
 

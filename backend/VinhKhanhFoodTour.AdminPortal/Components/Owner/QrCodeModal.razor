@@ -143,7 +143,7 @@
         // Gọi JavaScript để trigger download
         await JS.InvokeVoidAsync("downloadBase64File", _qrBase64, fileName, "image/png");
     }
-
+    
     private async Task HandleBackdropClick() => await Close();
 
     private async Task Close()

@@ -1,6 +1,7 @@
 using VinhKhanhFoodTour.AdminPortal.Services.Http;
 using Microsoft.Extensions.Logging;
 using VinhKhanhFoodTour.AdminPortal.Models.Auth;
+using VinhKhanhFoodTour.AdminPortal.Models.Admin;
 
 namespace VinhKhanhFoodTour.AdminPortal.Services.Admin;
 
@@ -128,6 +129,62 @@ public class AdminService : IAdminService
         catch (Exception ex)
         {
             _logger.LogError($"Error fetching user stats: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<List<UserDeviceDto>> GetActiveDevicesAsync(int userId)
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<UserDeviceDto>>($"api/v1/Users/{userId}/devices");
+            return result ?? new List<UserDeviceDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching devices for user {userId}: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<UserActionResponseDto> RevokeDeviceAsync(int userId, string deviceId)
+    {
+        try
+        {
+            var result = await _apiClient.DeleteAsync<UserActionResponseDto>($"api/v1/Users/{userId}/devices/{deviceId}");
+            return result ?? new UserActionResponseDto { Message = "Device access revoked successfully." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error revoking device {deviceId} for user {userId}: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<List<AdminAudioDto>> GetAudioFilesAsync()
+    {
+        try
+        {
+            var result = await _apiClient.GetAsync<List<AdminAudioDto>>("api/v1/Media/audio");
+            return result ?? new List<AdminAudioDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error fetching audio files: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<UserActionResponseDto> DeleteAudioFileAsync(string fileName)
+    {
+        try
+        {
+            var result = await _apiClient.DeleteAsync<UserActionResponseDto>($"api/v1/Media/audio/{fileName}");
+            return result ?? new UserActionResponseDto { Message = "Audio file deleted successfully." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error deleting audio file {fileName}: {ex.Message}");
             throw;
         }
     }

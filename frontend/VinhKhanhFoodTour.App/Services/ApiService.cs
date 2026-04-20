@@ -24,18 +24,10 @@ public class ApiService
     /// </summary>
     public static string BaseAddress => Constants.API_BASE_URL;
 
-    public ApiService()
+    public ApiService(HttpClient httpClient)
     {
-        _httpClient = new HttpClient();
-
-        // Đảm bảo BaseAddress chuẩn hóa (không bị dư dấu '/')
-        var finalAddress = BaseAddress.EndsWith("/") ? BaseAddress : BaseAddress + "/";
-        _httpClient.BaseAddress = new Uri(finalAddress);
-
-        // Timeout dựa trên cấu hình Constants
-        _httpClient.Timeout = TimeSpan.FromSeconds(Constants.HTTP_TIMEOUT_SECONDS);
-
-        Debug.WriteLine($"[API] Initialized with BaseAddress: {finalAddress}");
+        _httpClient = httpClient;
+        Debug.WriteLine($"[API] Initialized with BaseAddress from DI: {_httpClient.BaseAddress}");
     }
 
     private async Task SetAuthHeaderAsync()
@@ -108,10 +100,18 @@ public class ApiService
         }
         catch (HttpRequestException ex)
         {
-            Debug.WriteLine($"[API ERROR] Network error: {ex.Message}");
+            Debug.WriteLine($"[API ERROR] Network error (HttpRequestException): {ex}");
+            if (ex.InnerException != null)
+                Debug.WriteLine($"[API ERROR] Inner Exception: {ex.InnerException}");
+
             if (showErrorAlert)
+            {
+                var diagInfo = $"\n\nChi tiết kỹ thuật: {ex.Message}";
+                if (ex.InnerException != null) diagInfo += $"\nInner: {ex.InnerException.Message}";
+                
                 await ShowErrorAlert("🔌 Lỗi Mạng", 
-                    $"Không kết nối được tới Backend ({BaseAddress}).");
+                    $"Không kết nối được tới Backend ({BaseAddress}).{diagInfo}");
+            }
             return null;
         }
         catch (Exception ex)

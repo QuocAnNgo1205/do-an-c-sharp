@@ -43,9 +43,27 @@ public static class MauiProgram
             });
 
         // 1. ĐĂNG KÝ SERVICES
-        builder.Services.AddHttpClient<IPoiService, PoiService>();
-        builder.Services.AddSingleton<ApiService>();
-        builder.Services.AddSingleton<AuthService>(); // 🔐 MỚI: Dịch vụ xác thực
+        builder.Services.AddHttpClient<IPoiService, PoiService>(client => 
+        {
+            client.BaseAddress = new Uri(Constants.API_BASE_URL.EndsWith("/") ? Constants.API_BASE_URL : Constants.API_BASE_URL + "/");
+            client.Timeout = TimeSpan.FromSeconds(Constants.HTTP_TIMEOUT_SECONDS);
+        });
+
+        // 🌐 API Chung & Auth (Sử dụng AddHttpClient để kích hoạt Native Handler trên Android)
+        builder.Services.AddHttpClient<ApiService>(client => 
+        {
+            var baseAddress = Constants.API_BASE_URL.EndsWith("/") ? Constants.API_BASE_URL : Constants.API_BASE_URL + "/";
+            client.BaseAddress = new Uri(baseAddress);
+            client.Timeout = TimeSpan.FromSeconds(Constants.HTTP_TIMEOUT_SECONDS);
+        });
+
+        builder.Services.AddHttpClient<AuthService>(client => 
+        {
+            var baseAddress = Constants.API_BASE_URL.EndsWith("/") ? Constants.API_BASE_URL : Constants.API_BASE_URL + "/";
+            client.BaseAddress = new Uri(baseAddress);
+            client.Timeout = TimeSpan.FromSeconds(Constants.HTTP_TIMEOUT_SECONDS);
+        });
+
         builder.Services.AddSingleton<PoiCacheService>(); // 💾 MỚI: Cache SQLite
         builder.Services.AddSingleton(AudioManager.Current);
         builder.Services.AddSingleton<AudioGuideService>();  // 🔴 MỚI: Thuyết minh thông minh

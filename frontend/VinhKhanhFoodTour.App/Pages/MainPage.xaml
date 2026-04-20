@@ -102,7 +102,7 @@
                                         </VerticalStackLayout.GestureRecognizers>
 
                                         <Border StrokeShape="RoundRectangle 20,20,0,0" StrokeThickness="0" Margin="0" Padding="0">
-                                            <Image Aspect="AspectFill" HeightRequest="200" HorizontalOptions="Fill" Source="{Binding ImageUrl}" />
+                                            <Image Aspect="AspectFill" HeightRequest="200" HorizontalOptions="Fill" Source="{Binding FullImageUrl}" />
                                         </Border>
 
                                         <VerticalStackLayout Padding="15,15,15,5" Spacing="8">

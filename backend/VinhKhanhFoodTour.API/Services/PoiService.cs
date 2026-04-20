@@ -34,11 +34,20 @@ namespace VinhKhanhFoodTour.API.Services
         {
             if (string.IsNullOrWhiteSpace(relativePath)) return;
 
-            var wwwroot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"));
+            // Sử dụng đường dẫn tuyệt đối ổn định hơn
+            var contentRoot = AppDomain.CurrentDomain.BaseDirectory;
+            var wwwroot = Path.GetFullPath(Path.Combine(contentRoot, "wwwroot"));
+            
+            // Nếu không thấy wwwroot ở base directory (khi chạy debug), thử tìm ở project root
+            if (!Directory.Exists(wwwroot))
+            {
+                wwwroot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"));
+            }
+
             var fullPath = Path.GetFullPath(Path.Combine(wwwroot, relativePath.TrimStart('/', '\\')));
 
             // Bảo vệ: đường dẫn phải nằm TRONG wwwroot
-            if (!fullPath.StartsWith(wwwroot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            if (!fullPath.StartsWith(wwwroot, StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"[SECURITY] Path traversal attempt blocked: '{relativePath}' resolved to '{fullPath}'");
                 return;

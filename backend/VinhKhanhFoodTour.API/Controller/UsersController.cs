@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VinhKhanhFoodTour.Data;
 using VinhKhanhFoodTour.Models;
+using VinhKhanhFoodTour.API.DTOs;
 
 namespace VinhKhanhFoodTour.API.Controller
 {
@@ -23,7 +24,23 @@ namespace VinhKhanhFoodTour.API.Controller
         {
             var tourists = await _context.Users.Include(u => u.Role).CountAsync(u => u.Role != null && u.Role.RoleName == "Tourist");
             var owners = await _context.Users.Include(u => u.Role).CountAsync(u => u.Role != null && u.Role.RoleName == "Owner");
-            return Ok(new { TotalTourists = tourists, TotalOwners = owners, TotalUsers = tourists + owners });
+            
+            // Define 'Active' as having any activity in the last 5 minutes
+            var activeThreshold = DateTime.UtcNow.AddMinutes(-10);
+            var activeTourists = await _context.UserDevices
+                .Include(d => d.User)
+                .ThenInclude(u => u!.Role)
+                .Where(d => d.User != null && d.User.Role != null && d.User.Role.RoleName == "Tourist" && d.LastActiveAt >= activeThreshold)
+                .Select(d => d.UserId)
+                .Distinct()
+                .CountAsync();
+
+            return Ok(new { 
+                TotalTourists = tourists, 
+                TotalOwners = owners, 
+                TotalUsers = tourists + owners,
+                ActiveTourists = activeTourists
+            });
         }
 
         // GET: api/v1/Users
@@ -154,6 +171,45 @@ namespace VinhKhanhFoodTour.API.Controller
             {
                 return StatusCode(500, new { Message = "Lỗi hệ thống khi xóa User.", Detail = ex.Message });
             }
+        }
+
+        // GET: api/v1/Users/{id}/devices
+        [HttpGet("{id}/devices")]
+        public async Task<ActionResult<IEnumerable<UserDeviceDto>>> GetUserDevices(int id)
+        {
+            var devices = await _context.UserDevices
+                .Where(d => d.UserId == id)
+                .OrderByDescending(d => d.LastActiveAt)
+                .Select(d => new UserDeviceDto
+                {
+                    Id = d.Id,
+                    DeviceId = d.DeviceId,
+                    DeviceName = d.DeviceName,
+                    Os = d.Os,
+                    LastActiveAt = d.LastActiveAt,
+                    IsRevoked = d.IsRevoked
+                })
+                .ToListAsync();
+
+            return Ok(devices);
+        }
+
+        // DELETE: api/v1/Users/{id}/devices/{deviceId}
+        [HttpDelete("{id}/devices/{deviceId}")]
+        public async Task<IActionResult> RevokeDevice(int id, string deviceId)
+        {
+            var device = await _context.UserDevices
+                .FirstOrDefaultAsync(d => d.UserId == id && d.DeviceId == deviceId);
+
+            if (device == null)
+            {
+                return NotFound(new { Message = "Không tìm thấy thiết bị!" });
+            }
+
+            _context.UserDevices.Remove(device);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Đã thu hồi quyền truy cập của thiết bị thành công." });
         }
     }
 

@@ -12,7 +12,7 @@
     <ScrollView>
         <VerticalStackLayout Spacing="0">
             <Grid HeightRequest="320">
-                <Image Source="{Binding Poi.ImageUrl}" 
+                <Image Source="{Binding Poi.FullImageUrl}" 
                        Aspect="AspectFill" 
                        HorizontalOptions="Fill" />
 

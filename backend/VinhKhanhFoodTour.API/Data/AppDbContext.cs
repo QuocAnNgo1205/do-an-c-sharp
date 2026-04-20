@@ -20,6 +20,7 @@ namespace VinhKhanhFoodTour.Data
         public DbSet<TourPoi> TourPois { get; set; } = null!;
         public DbSet<TourUsageLog> TourUsageLogs { get; set; } = null!;
         public DbSet<UserLocationLog> UserLocationLogs { get; set; } = null!;
+        public DbSet<UserDevice> UserDevices { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -50,6 +51,12 @@ namespace VinhKhanhFoodTour.Data
                 entity.HasMany(u => u.OwnedPois)
                     .WithOne(p => p.Owner)
                     .HasForeignKey(p => p.OwnerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // One-to-Many: User -> UserDevices
+                entity.HasMany(u => u.UserDevices)
+                    .WithOne(d => d.User)
+                    .HasForeignKey(d => d.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
@@ -163,6 +170,18 @@ namespace VinhKhanhFoodTour.Data
                 
                 entity.HasIndex(l => l.Timestamp);
                 entity.HasIndex(l => l.DeviceId);
+            });
+
+            // ============== UserDevice Configuration ==============
+            modelBuilder.Entity<UserDevice>(entity =>
+            {
+                entity.HasKey(d => d.Id);
+                entity.Property(d => d.DeviceId).IsRequired().HasMaxLength(255);
+                entity.Property(d => d.DeviceName).HasMaxLength(100);
+                entity.Property(d => d.Os).HasMaxLength(50);
+                entity.Property(d => d.LastActiveAt).HasDefaultValueSql("GETUTCDATE()");
+
+                entity.HasIndex(d => new { d.UserId, d.DeviceId }).IsUnique();
             });
         }
     }

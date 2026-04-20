@@ -40,13 +40,7 @@
                         <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Lượt nghe</p>
                     </div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-2xl">📷</div>
-                    <div>
-                        <p class="text-2xl font-bold text-gray-900">@(_stats.Sum(s => s.QrScanCount))</p>
-                        <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Lượt quét QR</p>
-                    </div>
-                </div>
+                
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                     <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-2xl">📈</div>
                     <div>
@@ -54,6 +48,22 @@
                         <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Tăng trưởng tháng</p>
                     </div>
                 </div>
+                @if (_userStats != null)
+                {
+                    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-2xl">👥</div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <p class="text-2xl font-bold text-gray-900">@_userStats.ActiveTourists</p>
+                                <span class="flex h-3 w-3 relative">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Du khách Online</p>
+                        </div>
+                    </div>
+                }
             </div>
 
             <!-- Main Chart -->
@@ -258,6 +268,7 @@
 
     private List<PoiAnalyticsStat> _stats = new();
     private List<MonthlyPoint>     _trend  = new();
+    private UserStatsDto? _userStats = null;
     private bool IsLoadingStats = true;
     private bool _chartRendered = false;
 
@@ -301,12 +312,19 @@
         try
         {
             IsLoadingStats = true;
-            var result = await ApiClient.GetAsync<PoiAnalyticsResponse>("api/v1/Poi/analytics");
+            var analyticsTask = ApiClient.GetAsync<PoiAnalyticsResponse>("api/v1/Poi/analytics");
+            var userStatsTask = AdminService != null ? AdminService.GetUserStatsAsync() : Task.FromResult<UserStatsDto?>(null);
+            
+            await Task.WhenAll(analyticsTask, userStatsTask);
+            
+            var result = await analyticsTask;
             if (result is not null)
             {
                 _stats = result.PoiStats;
                 _trend = result.MonthlyTrend;
             }
+            
+            _userStats = await userStatsTask;
         }
         catch (Exception ex)
         {

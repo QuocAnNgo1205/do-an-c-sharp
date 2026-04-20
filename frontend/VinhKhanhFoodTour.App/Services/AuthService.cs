@@ -8,19 +8,24 @@ public class AuthService
 {
     private readonly HttpClient _httpClient;
 
-    public AuthService()
+    public AuthService(HttpClient httpClient)
     {
-        _httpClient = new HttpClient();
-        var baseAddress = Constants.API_BASE_URL.EndsWith("/") ? Constants.API_BASE_URL : Constants.API_BASE_URL + "/";
-        _httpClient.BaseAddress = new Uri(baseAddress);
-        _httpClient.Timeout = TimeSpan.FromSeconds(Constants.HTTP_TIMEOUT_SECONDS);
+        _httpClient = httpClient;
+        Debug.WriteLine($"[AuthService] Initialized with BaseAddress from DI: {_httpClient.BaseAddress}");
     }
 
     public async Task<(bool Success, string Message)> LoginAsync(string username, string password)
     {
         try
         {
-            var loginData = new { Username = username, Password = password };
+            var loginData = new 
+            { 
+                Username = username, 
+                Password = password,
+                DeviceId = DeviceInfo.Current.Model, // Use Model as fallback or identifier if possible, but real DeviceId is better.
+                DeviceName = DeviceInfo.Current.Name,
+                Os = DeviceInfo.Current.Platform.ToString()
+            };
             var response = await _httpClient.PostAsJsonAsync("Auth/login", loginData);
 
             if (response.IsSuccessStatusCode)
@@ -60,7 +65,12 @@ public class AuthService
     {
         try
         {
-            var loginData = new { DeviceId = deviceId };
+            var loginData = new 
+            { 
+                DeviceId = deviceId,
+                DeviceName = DeviceInfo.Current.Name,
+                Os = DeviceInfo.Current.Platform.ToString()
+            };
             var response = await _httpClient.PostAsJsonAsync("Auth/guest-login", loginData);
 
             if (response.IsSuccessStatusCode)
@@ -134,6 +144,32 @@ public class AuthService
         
         // Reset lại cờ chọn ngôn ngữ để acc sau (hoặc đăng ký mới) đăng nhập vào sẽ được hỏi lại
         Preferences.Default.Remove("HasSelectedLanguageFirstTime");
+    }
+
+    public async Task PingActivityAsync()
+    {
+        if (!await IsLoggedInAsync()) return;
+
+        try
+        {
+            var pingData = new 
+            { 
+                DeviceId = DeviceInfo.Current.Model,
+                DeviceName = DeviceInfo.Current.Name,
+                Os = DeviceInfo.Current.Platform.ToString()
+            };
+            
+            // Note: HttpClient should already have the Auth header if configured in ApiService/DI
+            var response = await _httpClient.PostAsJsonAsync("Auth/ping", pingData);
+            if (response.IsSuccessStatusCode)
+            {
+                Debug.WriteLine("[Auth] Activity ping sent successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Auth] Activity ping failed: {ex.Message}");
+        }
     }
 
     public async Task<bool> IsLoggedInAsync()

@@ -12,6 +12,7 @@ namespace VinhKhanhFoodTour.App.PageModels
         private readonly AudioGuideService _audioGuideService;
         private readonly GeofenceManager _geofenceManager;
         private readonly PoiCacheService _poiCache;
+        private readonly AuthService _authService;
         private bool _isGeofenceStarted = false; // Guard: tránh Start() bị gọi nhiều lần
 
         [ObservableProperty]
@@ -28,12 +29,13 @@ namespace VinhKhanhFoodTour.App.PageModels
         [ObservableProperty] private ObservableCollection<PoiCategory> categoryData = new();
         [ObservableProperty] private List<Brush> categoryColors = new();
 
-        public MainPageModel(ApiService apiService, AudioGuideService audioGuideService, GeofenceManager geofenceManager, PoiCacheService poiCache)
+        public MainPageModel(ApiService apiService, AudioGuideService audioGuideService, GeofenceManager geofenceManager, PoiCacheService poiCache, AuthService authService)
         {
             _apiService = apiService;
             _audioGuideService = audioGuideService;
             _geofenceManager = geofenceManager;
             _poiCache = poiCache;
+            _authService = authService;
 
             // 🛑 MỚI: Đồng bộ trạng thái UI tĩnh mượt mà bất kể ai gọi (Kể cả Geofence)
             _audioGuideService.PlaybackStateChanged += (s, e) => 
@@ -233,6 +235,7 @@ namespace VinhKhanhFoodTour.App.PageModels
         [RelayCommand]
         private async Task Appearing()
         {
+            _ = _authService.PingActivityAsync(); // Ghi nhận hoạt động thiết bị (không chờ)
             await LoadDataAsync();
 
             // 🛰️ BUG FIX: Khởi động GPS Geofencing nếu chưa Start

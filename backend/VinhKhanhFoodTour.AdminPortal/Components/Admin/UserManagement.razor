@@ -29,9 +29,15 @@
                     <div class="text-3xl font-bold text-purple-600 mt-2">@Stats.TotalUsers</div>
                     <p class="text-xs text-gray-500 mt-2">Toàn bộ hệ thống</p>
                 </div>
-                <div class="card">
+                <div class="card relative overflow-hidden">
                     <div class="text-sm text-gray-600 uppercase tracking-wide">Người Tải App (Tourists)</div>
-                    <div class="text-3xl font-bold text-blue-600 mt-2">@Stats.TotalTourists</div>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <div class="text-3xl font-bold text-blue-600">@Stats.TotalTourists</div>
+                        <div class="text-sm font-medium text-emerald-600 flex items-center gap-1">
+                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                            @Stats.ActiveTourists đang hoạt động
+                        </div>
+                    </div>
                     <p class="text-xs text-gray-500 mt-2">Sử dụng dịch vụ Audio Guide</p>
                 </div>
                 <div class="card">
@@ -141,6 +147,8 @@
                                             title="Xóa người dùng này vĩnh viễn">
                                             🗑️ Xóa
                                         </button>
+
+
                                     </td>
                                 </tr>
                             }
@@ -150,6 +158,8 @@
             </div>
         </div>
     </div>
+
+
     @if (ShowAddModal)
     {
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -248,6 +258,8 @@
 
     // Modal Delete State
     private UserDto? UserToDelete = null;
+
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -400,6 +412,8 @@
             ProcessingUserId = null;
         }
     }
+
+
 
     private string GetRoleBadgeClass(string roleName) => roleName switch
     {

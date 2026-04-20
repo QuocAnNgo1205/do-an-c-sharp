@@ -15,7 +15,7 @@ namespace VinhKhanhFoodTour.App.Data
         // Base URL được tự động cấu hình dựa trên Platform
         public static string API_BASE_URL => 
             DeviceInfo.Platform == DevicePlatform.Android 
-                ? $"http://10.0.2.2:{BACKEND_PORT}/api/v1"  // Android Emulator: 10.0.2.2 trỏ tới localhost máy tính. Thiết bị thật: thay bằng IP LAN (ipconfig)
+                ? $"http://192.168.31.191:{BACKEND_PORT}/api/v1"  // 192.168.31.191 là IP LAN hiện tại của máy tính
                 : $"http://127.0.0.1:{BACKEND_PORT}/api/v1"; // iOS Simulator / Desktop
 
         // Timeout mặc định cho HTTP requests (giây)

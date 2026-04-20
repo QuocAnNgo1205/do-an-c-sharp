@@ -21,6 +21,37 @@ namespace VinhKhanhFoodTour.API.Controllers
             _configuration = configuration;
         }
 
+        private async Task RecordDeviceActivityAsync(int userId, string? deviceId, string? deviceName, string? os)
+        {
+            if (string.IsNullOrEmpty(deviceId)) return;
+
+            var device = await _context.UserDevices
+                .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId);
+
+            if (device == null)
+            {
+                device = new VinhKhanhFoodTour.Models.UserDevice
+                {
+                    UserId = userId,
+                    DeviceId = deviceId,
+                    DeviceName = deviceName,
+                    Os = os,
+                    LastActiveAt = DateTime.UtcNow,
+                    IsRevoked = false
+                };
+                _context.UserDevices.Add(device);
+            }
+            else
+            {
+                device.DeviceName = deviceName ?? device.DeviceName;
+                device.Os = os ?? device.Os;
+                device.LastActiveAt = DateTime.UtcNow;
+                device.IsRevoked = false; // Re-enable if it was revoked
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -72,6 +103,8 @@ namespace VinhKhanhFoodTour.API.Controllers
             );
 
             // 4. Trả vé về cho Frontend
+            await RecordDeviceActivityAsync(user.Id, request.DeviceId, request.DeviceName, request.Os);
+
             return Ok(new
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
@@ -174,6 +207,8 @@ namespace VinhKhanhFoodTour.API.Controllers
                 signingCredentials: creds
             );
 
+            await RecordDeviceActivityAsync(user.Id, deviceId, request.DeviceName, request.Os);
+
             return Ok(new
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
@@ -183,6 +218,32 @@ namespace VinhKhanhFoodTour.API.Controllers
                 Expiration = token.ValidTo
             });
         }
+
+        [HttpPost("ping")]
+        public async Task<IActionResult> Ping([FromBody] PingRequest request)
+        {
+            // Lấy UserId từ Token (nếu có)
+            var userIdClaim = User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdClaim))
+            {
+                return Unauthorized();
+            }
+
+            if (int.TryParse(userIdClaim, out int userId))
+            {
+                await RecordDeviceActivityAsync(userId, request.DeviceId, request.DeviceName, request.Os);
+                return Ok(new { Message = "Pong", LastActive = DateTime.UtcNow });
+            }
+
+            return BadRequest();
+        }
+    }
+
+    public class PingRequest
+    {
+        public string DeviceId { get; set; } = null!;
+        public string? DeviceName { get; set; }
+        public string? Os { get; set; }
     }
 
     // Class phụ để nhận data từ Frontend gửi lên
@@ -190,6 +251,9 @@ namespace VinhKhanhFoodTour.API.Controllers
     {
         public string Username { get; set; } = null!;
         public string Password { get; set; } = null!;
+        public string? DeviceId { get; set; }
+        public string? DeviceName { get; set; }
+        public string? Os { get; set; }
     }
 
     public class RegisterRequest
@@ -202,5 +266,7 @@ namespace VinhKhanhFoodTour.API.Controllers
     public class GuestLoginRequest
     {
         public string DeviceId { get; set; } = null!;
+        public string? DeviceName { get; set; }
+        public string? Os { get; set; }
     }
 }

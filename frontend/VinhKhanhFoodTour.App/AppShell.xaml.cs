@@ -5,8 +5,11 @@ namespace VinhKhanhFoodTour.App;
 
 public partial class AppShell : Shell
 {
-    public AppShell()
+    private readonly Services.AuthService _authService;
+
+    public AppShell(Services.AuthService authService)
     {
+        _authService = authService;
         InitializeComponent();
 
         // 🔗 Đăng ký Route cho các trang phụ (không nằm trong TabBar)
@@ -50,8 +53,7 @@ public partial class AppShell : Shell
                     await SecureStorage.SetAsync("device_id", deviceId);
                 }
 
-                var authService = new Services.AuthService();
-                await authService.GuestLoginAsync(deviceId);
+                await _authService.GuestLoginAsync(deviceId);
 
                 IsInitialized = true; // Đánh dấu đã khởi tạo xong
 

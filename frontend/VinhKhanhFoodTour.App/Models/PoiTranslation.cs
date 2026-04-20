@@ -47,5 +47,17 @@ namespace VinhKhanhFoodTour.App.Models
         /// </summary>
         [JsonPropertyName("imageUrl")]
         public string? ImageUrl { get; set; }
+
+        [JsonIgnore]
+        public string FullImageUrl
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(ImageUrl)) return "placeholder_restaurant.png";
+                if (ImageUrl.StartsWith("http")) return ImageUrl;
+                var rootUrl = Data.Constants.API_BASE_URL.Replace("/api/v1", "");
+                return $"{rootUrl.TrimEnd('/')}/{ImageUrl.TrimStart('/')}";
+            }
+        }
     }
 }

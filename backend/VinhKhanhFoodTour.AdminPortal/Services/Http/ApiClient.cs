@@ -264,4 +264,15 @@ public class ApiClient
         }
     }
 
+    /// <summary>
+    /// Helper to get full URL for media files
+    /// </summary>
+    public string GetFullUrl(string relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath)) return string.Empty;
+        if (relativePath.StartsWith("http")) return relativePath;
+
+        var baseAddress = _httpClient.BaseAddress?.ToString() ?? "";
+        return $"{baseAddress.TrimEnd('/')}/{relativePath.TrimStart('/')}";
+    }
 }

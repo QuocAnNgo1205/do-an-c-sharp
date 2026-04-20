@@ -1,0 +1,234 @@
+@page "/admin/audio"
+@using VinhKhanhFoodTour.AdminPortal.Services.Admin
+@using VinhKhanhFoodTour.AdminPortal.Models.Admin
+@using VinhKhanhFoodTour.AdminPortal.Components.Layout
+@inject VinhKhanhFoodTour.AdminPortal.Services.Http.ApiClient ApiClient
+
+<ProtectedRoute RequiredRoles="Admin">
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Quản lý File Âm thanh</h1>
+                <p class="text-gray-600 mt-1">Danh sách toàn bộ các file thuyết minh đã tải lên hệ thống.</p>
+            </div>
+            <button @onclick="LoadAudioFilesAsync" class="btn btn-secondary" disabled="@IsLoading">
+                🔄 Làm mới
+            </button>
+        </div>
+
+        <!-- Filters & Search -->
+        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap gap-4 items-center">
+            <div class="flex-1 min-w-[200px] relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                <input type="text" @bind-value="SearchQuery" @bind-value:event="oninput" 
+                       placeholder="Tìm kiếm theo tên file hoặc quán ăn..." 
+                       class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+            </div>
+            <div class="flex gap-2">
+                <span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-semibold text-gray-500">
+                    @(FilteredFiles.Count) / @(Files.Count) Files
+                </span>
+            </div>
+        </div>
+
+        <!-- Audio Grid/Table -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="table-container">
+                <table class="table w-full text-left">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="px-6 py-4 text-xs font-semibold text-gray-400 uppercase">File Info</th>
+                            <th class="px-6 py-4 text-xs font-semibold text-gray-400 uppercase">Sử dụng bởi</th>
+                            <th class="px-6 py-4 text-xs font-semibold text-gray-400 uppercase">Nghe thử</th>
+                            <th class="px-6 py-4 text-xs font-semibold text-gray-400 uppercase text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-12">
+                                    <div class="spinner-dot mx-auto mb-4"></div>
+                                    <p class="text-gray-500">Đang quét thư mục âm thanh...</p>
+                                </td>
+                            </tr>
+                        }
+                        else if (!FilteredFiles.Any())
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-12 text-gray-500">
+                                    Không tìm thấy file âm thanh nào.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var file in FilteredFiles)
+                            {
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-col">
+                                            <span class="font-medium text-gray-900 truncate max-w-xs" title="@file.FileName">@file.FileName</span>
+                                            <div class="flex gap-2 text-xs text-gray-500 mt-1">
+                                                <span>@(FormatSize(file.FileSize))</span>
+                                                <span>•</span>
+                                                <span>@(file.LastModified?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        @if (file.IsUsed)
+                                        {
+                                            <div class="flex flex-col">
+                                                <span class="text-sm font-semibold text-blue-600">@file.PoiName</span>
+                                                <span class="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded w-fit mt-1">
+                                                    Ngôn ngữ: @file.LanguageCode?.ToUpper()
+                                                </span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded">
+                                                Chưa sử dụng
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <audio controls class="h-8 max-w-[200px]">
+                                            <source src="@GetFullUrl(file.FilePath)" type="audio/mpeg">
+                                            Browser không hỗ trợ audio.
+                                        </audio>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <button @onclick="() => ConfirmDelete(file)" 
+                                                class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Xóa file vĩnh viễn">
+                                            🗑️
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    @if (FileToDelete != null)
+    {
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden anim-pop">
+                <div class="p-6 text-center">
+                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                        ⚠️
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa file</h3>
+                    <p class="text-gray-600 mb-2">
+                        Bạn có chắc chắn muốn xóa file <strong>@FileToDelete.FileName</strong> không?
+                    </p>
+                    @if (FileToDelete.IsUsed)
+                    {
+                        <div class="p-3 bg-amber-50 border border-amber-100 rounded-lg text-amber-700 text-xs text-left mb-6">
+                            <strong>Lưu ý:</strong> File này đang được sử dụng bởi quán <strong>@FileToDelete.PoiName</strong>. 
+                            Nếu xóa, quán này sẽ không còn âm thanh thuyết minh tương ứng.
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-gray-500 text-sm mb-6">Hành động này không thể hoàn tác.</p>
+                    }
+
+                    <div class="flex gap-3">
+                        <button @onclick="() => FileToDelete = null" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors">
+                            Hủy
+                        </button>
+                        <button @onclick="HandleDeleteAsync" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold">
+                            Xác nhận Xóa
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <Notifications @ref="NotificationComponent" />
+</ProtectedRoute>
+
+@code {
+    [Inject] private IAdminService? AdminService { get; set; }
+    private Notifications? NotificationComponent { get; set; }
+
+    private List<AdminAudioDto> Files = new();
+    private bool IsLoading = true;
+    private string SearchQuery = "";
+    private AdminAudioDto? FileToDelete = null;
+
+    private List<AdminAudioDto> FilteredFiles => Files
+        .Where(f => string.IsNullOrEmpty(SearchQuery) || 
+                   f.FileName.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                   (f.PoiName?.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ?? false))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAudioFilesAsync();
+    }
+
+    private async Task LoadAudioFilesAsync()
+    {
+        if (AdminService == null) return;
+        IsLoading = true;
+        try
+        {
+            Files = await AdminService.GetAudioFilesAsync();
+        }
+        catch (Exception)
+        {
+            NotificationComponent?.ShowNotification("Lỗi", "Không thể tải danh sách âm thanh.", Notifications.NotificationType.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ConfirmDelete(AdminAudioDto file) => FileToDelete = file;
+
+    private async Task HandleDeleteAsync()
+    {
+        if (FileToDelete == null || AdminService == null) return;
+
+        try
+        {
+            var result = await AdminService.DeleteAudioFileAsync(FileToDelete.FileName);
+            NotificationComponent?.ShowNotification("Thành công", result.Message, Notifications.NotificationType.Success);
+            Files.Remove(FileToDelete);
+        }
+        catch (Exception)
+        {
+            NotificationComponent?.ShowNotification("Lỗi", "Không thể xóa file.", Notifications.NotificationType.Error);
+        }
+        finally
+        {
+            FileToDelete = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{(bytes / 1024.0):F1} KB";
+        return $"{(bytes / (1024.0 * 1024.0)):F1} MB";
+    }
+
+    private string GetFullUrl(string relativePath)
+    {
+        var rawUrl = ApiClient.GetFullUrl(relativePath);
+        return rawUrl;
+    }
+}

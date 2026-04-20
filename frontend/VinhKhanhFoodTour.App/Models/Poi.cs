@@ -34,6 +34,30 @@ namespace VinhKhanhFoodTour.App.Models
         [JsonPropertyName("imageUrl")]
         public string ImageUrl { get; set; } = string.Empty;
 
+        [JsonIgnore]
+        public string FullImageUrl
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(ImageUrl)) return "placeholder_restaurant.png";
+                
+                // Nếu URL đã là http nhưng trỏ vào localhost/127.0.0.1 (do cache cũ), ta cần đổi lại IP mới
+                var finalImageUrl = ImageUrl;
+                if (finalImageUrl.Contains("localhost") || finalImageUrl.Contains("127.0.0.1"))
+                {
+                    // Lấy phần path sau port (ví dụ: /uploads/images/...)
+                    var uri = new Uri(finalImageUrl);
+                    finalImageUrl = uri.PathAndQuery;
+                }
+
+                if (finalImageUrl.StartsWith("http")) return finalImageUrl;
+
+                // Xây dựng URL tuyệt đối dựa trên IP LAN hiện tại từ Constants
+                var rootUrl = Data.Constants.API_BASE_URL.Replace("/api/v1", "");
+                return $"{rootUrl.TrimEnd('/')}/{finalImageUrl.TrimStart('/')}";
+            }
+        }
+
         [JsonPropertyName("status")]
         public int Status { get; set; }
 
